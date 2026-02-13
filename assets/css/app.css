@@ -1,0 +1,20 @@
+.mlb-body { background:#0b0f17; color:#e5e7eb; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+.mlb-container { max-width: 980px; margin: 0 auto; padding: 28px 16px; }
+.mlb-card { background:#111827; border:1px solid #1f2937; border-radius:14px; padding:22px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+.mlb-title { margin:0 0 14px; font-size:22px; }
+.mlb-muted { color:#94a3b8; margin:0; }
+
+.mlb-form { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.mlb-label { font-size:13px; color:#cbd5e1; }
+.mlb-input { background:#0b1220; border:1px solid #253043; color:#e5e7eb; padding:12px 12px; border-radius:10px; outline:none; }
+.mlb-input:focus { border-color:#22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.15); }
+
+.mlb-btn { border:0; border-radius:10px; padding:12px 14px; cursor:pointer; font-weight:700; }
+.mlb-btn--primary { background:#22c55e; color:#0b0f17; }
+
+.mlb-alert { border-radius:12px; padding:12px 12px; margin-top:12px; }
+.mlb-alert--success { background: rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.25); }
+.mlb-alert--error { background: rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.25); }
+.mlb-alert--info { background: rgba(59,130,246,.12); border:1px solid rgba(59,130,246,.25); }
+.mlb-list { margin:0; padding-left:18px; }
+.mlb-link { color:#60a5fa; text-decoration:none; }
