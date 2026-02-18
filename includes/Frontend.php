@@ -68,13 +68,11 @@ class MLB_LMS_Frontend
                         wp_update_user([
                             'ID' => $user_id,
                             'display_name' => $full_name,
-                            'first_name' => $full_name, // você pode separar depois
+                            'first_name' => $full_name,
                             'role' => 'malibu_student',
                         ]);
 
                         MLB_LMS_Helpers::upsert_student_profile($user_id, $full_name, $phone);
-
-                        // envia e-mail "defina sua senha"
                         MLB_LMS_Mailer::send_set_password_email($user_id);
 
                         $success = true;
@@ -134,12 +132,41 @@ class MLB_LMS_Frontend
         self::footer();
     }
 
+    private static function render_access_gate($course_id)
+    {
+        if (!is_user_logged_in()) {
+            echo '<div class="mlb-alert mlb-alert--info" style="margin-top:16px;">';
+            echo 'Faça login para acessar este conteúdo. ';
+            echo '<a class="mlb-link" href="' . esc_url(wp_login_url(home_url('/curso/' . get_post_field('post_name', $course_id)))) . '">Entrar</a>';
+            echo '</div>';
+            return;
+        }
+
+        $product_id = (int) get_post_meta($course_id, '_mlb_course_product_id', true);
+
+        echo '<div class="mlb-alert mlb-alert--info" style="margin-top:16px;">';
+        echo '<strong>Este conteúdo é exclusivo para alunos matriculados.</strong><br>';
+
+        if ($product_id > 0 && class_exists('WooCommerce') && get_post($product_id)) {
+            echo '<a class="mlb-btn mlb-btn--primary" style="display:inline-block;text-decoration:none;margin-top:10px;" href="' . esc_url(get_permalink($product_id)) . '">Comprar curso</a>';
+        } else {
+            echo '<span style="display:block;margin-top:8px;">Produto do curso não encontrado. Verifique o curso no admin.</span>';
+        }
+
+        echo '</div>';
+    }
+
+    private static function user_can_access_course($course_id)
+    {
+        if (!is_user_logged_in()) return false;
+        return MLB_LMS_Enrollments::has_active_enrollment(get_current_user_id(), $course_id);
+    }
+
     public static function render_course_by_slug($slug)
     {
         $course = get_page_by_path($slug, OBJECT, 'mlb_course');
 
         self::header('Curso - Malibu');
-
         echo '<div class="mlb-container"><div class="mlb-card">';
 
         if (!$course) {
@@ -150,6 +177,7 @@ class MLB_LMS_Frontend
         }
 
         $trailer = get_post_meta($course->ID, '_mlb_course_trailer', true);
+        $has_access = self::user_can_access_course($course->ID);
 
         echo '<h1 class="mlb-title">' . esc_html($course->post_title) . '</h1>';
 
@@ -168,7 +196,15 @@ class MLB_LMS_Frontend
         echo apply_filters('the_content', $course->post_content);
         echo '</div>';
 
-        // Lista aulas vinculadas
+        echo '<hr><h2 style="margin-top:10px;">Aulas</h2>';
+
+        if (!$has_access) {
+            self::render_access_gate($course->ID);
+            echo '</div></div>';
+            self::footer();
+            return;
+        }
+
         $lessons = get_posts([
             'post_type' => 'mlb_lesson',
             'numberposts' => -1,
@@ -178,9 +214,6 @@ class MLB_LMS_Frontend
             'orderby' => 'title',
             'order' => 'ASC',
         ]);
-
-        echo '<hr>';
-        echo '<h2 style="margin-top:10px;">Aulas</h2>';
 
         if (!$lessons) {
             echo '<p class="mlb-muted">Nenhuma aula cadastrada ainda.</p>';
@@ -196,66 +229,70 @@ class MLB_LMS_Frontend
         echo '</div></div>';
         self::footer();
     }
+
     public static function render_lesson_by_slug($course_slug, $lesson_slug)
-{
-    $course = get_page_by_path($course_slug, OBJECT, 'mlb_course');
-    $lesson = get_page_by_path($lesson_slug, OBJECT, 'mlb_lesson');
+    {
+        $course = get_page_by_path($course_slug, OBJECT, 'mlb_course');
+        $lesson = get_page_by_path($lesson_slug, OBJECT, 'mlb_lesson');
 
-    self::header('Aula - Malibu');
+        self::header('Aula - Malibu');
+        echo '<div class="mlb-container"><div class="mlb-card">';
 
-    echo '<div class="mlb-container"><div class="mlb-card">';
+        if (!$course || !$lesson) {
+            echo '<h1 class="mlb-title">Aula não encontrada</h1>';
+            echo '</div></div>';
+            self::footer();
+            return;
+        }
 
-    if (!$course || !$lesson) {
-        echo '<h1 class="mlb-title">Aula não encontrada</h1>';
-        echo '</div></div>';
-        self::footer();
-        return;
-    }
+        $lesson_course_id = (int) get_post_meta($lesson->ID, '_mlb_lesson_course_id', true);
+        if ($lesson_course_id !== (int)$course->ID) {
+            echo '<h1 class="mlb-title">Aula não pertence a este curso</h1>';
+            echo '</div></div>';
+            self::footer();
+            return;
+        }
 
-    // garante que a aula pertence ao curso
-    $lesson_course_id = (int) get_post_meta($lesson->ID, '_mlb_lesson_course_id', true);
-    if ($lesson_course_id !== (int)$course->ID) {
-        echo '<h1 class="mlb-title">Aula não pertence a este curso</h1>';
-        echo '</div></div>';
-        self::footer();
-        return;
-    }
+        echo '<a class="mlb-link" href="' . esc_url(home_url('/curso/' . $course_slug)) . '">← Voltar para o curso</a>';
+        echo '<h1 class="mlb-title" style="margin-top:10px;">' . esc_html($lesson->post_title) . '</h1>';
 
-    $video = get_post_meta($lesson->ID, '_mlb_lesson_video_url', true);
-    $materials = get_post_meta($lesson->ID, '_mlb_lesson_materials', true);
-    if (!is_array($materials)) $materials = [];
+        if (!self::user_can_access_course($course->ID)) {
+            self::render_access_gate($course->ID);
+            echo '</div></div>';
+            self::footer();
+            return;
+        }
 
-    echo '<a class="mlb-link" href="' . esc_url(home_url('/curso/' . $course_slug)) . '">← Voltar para o curso</a>';
+        $video = get_post_meta($lesson->ID, '_mlb_lesson_video_url', true);
+        $materials = get_post_meta($lesson->ID, '_mlb_lesson_materials', true);
+        if (!is_array($materials)) $materials = [];
 
-    echo '<h1 class="mlb-title" style="margin-top:10px;">' . esc_html($lesson->post_title) . '</h1>';
+        if ($video) {
+            $embed = wp_oembed_get($video);
+            if ($embed) {
+                echo '<div style="margin:16px 0;">' . $embed . '</div>';
+            } else {
+                echo '<p class="mlb-muted">Vídeo informado, mas não foi possível gerar o player.</p>';
+            }
+        }
 
-    if ($video) {
-        $embed = wp_oembed_get($video);
-        if ($embed) {
-            echo '<div style="margin:16px 0;">' . $embed . '</div>';
+        echo '<div class="mlb-content">';
+        echo apply_filters('the_content', $lesson->post_content);
+        echo '</div>';
+
+        echo '<hr><h2>Materiais</h2>';
+        if (!$materials) {
+            echo '<p class="mlb-muted">Sem materiais nesta aula.</p>';
         } else {
-            echo '<p class="mlb-muted">Vídeo informado, mas não foi possível gerar o player.</p>';
+            echo '<ul class="mlb-list">';
+            foreach ($materials as $m) {
+                $url = esc_url($m);
+                echo '<li><a class="mlb-link" href="' . $url . '" target="_blank" rel="noopener">' . esc_html($m) . '</a></li>';
+            }
+            echo '</ul>';
         }
+
+        echo '</div></div>';
+        self::footer();
     }
-
-    echo '<div class="mlb-content">';
-    echo apply_filters('the_content', $lesson->post_content);
-    echo '</div>';
-
-    echo '<hr><h2>Materiais</h2>';
-    if (!$materials) {
-        echo '<p class="mlb-muted">Sem materiais nesta aula.</p>';
-    } else {
-        echo '<ul class="mlb-list">';
-        foreach ($materials as $m) {
-            $url = esc_url($m);
-            echo '<li><a class="mlb-link" href="' . $url . '" target="_blank" rel="noopener">' . esc_html($m) . '</a></li>';
-        }
-        echo '</ul>';
-    }
-
-    echo '</div></div>';
-    self::footer();
-}
-
 }

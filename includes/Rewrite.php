@@ -42,6 +42,11 @@ class MLB_LMS_Rewrite
             exit;
         }
 
+        if ($course_slug) {
+            MLB_LMS_Frontend::render_course_by_slug($course_slug);
+            exit;
+        }
+
 
         if (get_query_var('mlb_my_courses')) {
             MLB_LMS_Frontend::render_my_courses();
