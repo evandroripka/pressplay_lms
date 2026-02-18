@@ -28,6 +28,8 @@ require_once MLB_LMS_PATH . 'includes/Metabox_Course.php';
 require_once MLB_LMS_PATH . 'includes/Metabox_Lesson.php';
 require_once MLB_LMS_PATH . 'includes/Woo.php';
 require_once MLB_LMS_PATH . 'includes/Templates.php';
+require_once MLB_LMS_PATH . 'includes/Enrollments.php';
+require_once MLB_LMS_PATH . 'includes/Actions.php';
 
 
 register_activation_hook(__FILE__, ['MLB_LMS_Activator', 'activate']);
@@ -44,8 +46,8 @@ add_action('plugins_loaded', function () {
     MLB_LMS_Lesson_Meta::init();
     MLB_LMS_Woo::init();
     MLB_LMS_Templates::init();
-
-
+    MLB_LMS_Enrollments::class; // (não precisa init)
+    MLB_LMS_Actions::init();
 });
 
 add_action('wp_enqueue_scripts', function () {

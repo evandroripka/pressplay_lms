@@ -9,7 +9,44 @@ class MLB_LMS_Woo
         add_action('save_post_mlb_course', [__CLASS__, 'maybe_sync_product'], 20, 2);
 
         // (depois) cria matrícula quando pedido concluir
-        // add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);
+        add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);
+    }
+    public static function handle_order_completed($order_id)
+    {
+        if (!class_exists('WooCommerce')) return;
+
+        $order = wc_get_order($order_id);
+        if (!$order) return;
+
+        $user_id = (int) $order->get_user_id();
+        if ($user_id <= 0) return;
+
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if (!$product) continue;
+
+            $product_id = (int) $product->get_id();
+
+            // Preferencial: produto guarda course_id
+            $course_id = (int) get_post_meta($product_id, '_mlb_course_id', true);
+
+            // Fallback: achar curso pelo meta _mlb_course_product_id
+            if (!$course_id) {
+                $q = new WP_Query([
+                    'post_type' => 'mlb_course',
+                    'post_status' => 'publish',
+                    'meta_key' => '_mlb_course_product_id',
+                    'meta_value' => $product_id,
+                    'posts_per_page' => 1,
+                    'fields' => 'ids',
+                ]);
+                if (!empty($q->posts[0])) $course_id = (int)$q->posts[0];
+            }
+
+            if ($course_id > 0) {
+                MLB_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int)$order_id, 'woocommerce');
+            }
+        }
     }
 
     private static function woo_active()
