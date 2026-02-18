@@ -13,8 +13,8 @@ class MLB_LMS_Settings
     {
         // Menu principal
         add_menu_page(
-            'Malibu LMS',
-            'Malibu LMS',
+            'Pressplay LMS',
+            'Pressplay LMS',
             'manage_options',
             'mlb-lms',
             [__CLASS__, 'page_dashboard'], // página padrão do menu principal
@@ -83,7 +83,7 @@ class MLB_LMS_Settings
 
     public static function page_dashboard()
     {
-        echo '<div class="wrap"><h1>Malibu LMS</h1><p>Dashboard geral (atalhos, métricas, status).</p></div>';
+        echo '<div class="wrap"><h1>Pressplay LMS</h1><p>Dashboard geral (atalhos, métricas, status).</p></div>';
     }
 
     public static function page_settings()
