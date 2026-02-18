@@ -24,7 +24,7 @@ class MLB_LMS_CPT
             'show_in_menu' => 'mlb-lms', // aparece dentro do menu Pressplay LMS
             'menu_icon' => 'dashicons-welcome-learn-more',
             'supports' => ['title', 'editor', 'thumbnail'],
-            'rewrite' => ['slug' => 'curso'],
+            'rewrite' => ['slug' => 'curso', 'with_front' => false],
             'has_archive' => false,
         ]);
     }
