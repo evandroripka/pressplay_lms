@@ -17,6 +17,7 @@ require_once MLB_LMS_PATH . 'includes/Dependencies.php';
 require_once MLB_LMS_PATH . 'includes/Activator.php';
 require_once MLB_LMS_PATH . 'includes/Deactivator.php';
 require_once MLB_LMS_PATH . 'includes/Database.php';
+require_once MLB_LMS_PATH . 'includes/Enrollments.php';
 require_once MLB_LMS_PATH . 'includes/Roles.php';
 require_once MLB_LMS_PATH . 'includes/Rewrite.php';
 require_once MLB_LMS_PATH . 'includes/Frontend.php';
@@ -43,9 +44,7 @@ add_action('plugins_loaded', function () {
     MLB_LMS_Course_Meta::init();
     MLB_LMS_Lesson_Meta::init();
     MLB_LMS_Woo::init();
-    MLB_LMS_Templates::init();
-
-
+    // Mantido opcional: roteamento principal via Rewrite + Frontend.
 });
 
 add_action('wp_enqueue_scripts', function () {
