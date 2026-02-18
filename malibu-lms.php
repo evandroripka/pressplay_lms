@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: Malibu LMS
  * Description: LMS enxuto para cursos (Vimeo), matrícula, progresso e certificado.
@@ -21,6 +22,9 @@ require_once MLB_LMS_PATH . 'includes/Frontend.php';
 require_once MLB_LMS_PATH . 'includes/Mailer.php';
 require_once MLB_LMS_PATH . 'includes/Settings.php';
 require_once MLB_LMS_PATH . 'includes/Helpers.php';
+require_once MLB_LMS_PATH . 'includes/CPT.php';
+require_once MLB_LMS_PATH . 'includes/Metabox_Course.php';
+require_once MLB_LMS_PATH . 'includes/Metabox_Lesson.php';
 
 register_activation_hook(__FILE__, ['MLB_LMS_Activator', 'activate']);
 register_deactivation_hook(__FILE__, ['MLB_LMS_Deactivator', 'deactivate']);
@@ -30,6 +34,9 @@ add_action('plugins_loaded', function () {
     MLB_LMS_Roles::init();
     MLB_LMS_Rewrite::init();
     MLB_LMS_Frontend::init();
+    MLB_LMS_CPT::init();
+    MLB_LMS_Course_Meta::init();
+    MLB_LMS_Lesson_Meta::init();
 });
 
 add_action('wp_enqueue_scripts', function () {
