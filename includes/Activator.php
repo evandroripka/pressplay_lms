@@ -1,9 +1,11 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-class MLB_LMS_Activator {
+class MLB_LMS_Activator
+{
 
-    public static function activate() {
+    public static function activate()
+    {
 
         // ===============================
         // Banco de dados
@@ -46,14 +48,18 @@ class MLB_LMS_Activator {
 
             // Backup das configs atuais (caso queira restaurar no futuro)
             update_option('mlb_lms_backup_guest_checkout', get_option('woocommerce_enable_guest_checkout'));
-            update_option('mlb_lms_backup_checkout_account_creation', get_option('woocommerce_enable_checkout_login_reminder'));
             update_option('mlb_lms_backup_myaccount_registration', get_option('woocommerce_enable_myaccount_registration'));
-            update_option('mlb_lms_backup_checkout_registration', get_option('woocommerce_enable_checkout_registration'));
+            update_option('mlb_lms_backup_generate_password', get_option('woocommerce_registration_generate_password'));
+            update_option('mlb_lms_backup_signup_and_login_from_checkout', get_option('woocommerce_enable_signup_and_login_from_checkout'));
+            update_option('mlb_lms_backup_checkout_registration', get_option('woocommerce_enable_checkout_registration')); // fallback legado
 
             // ❌ Desabilita checkout de convidado
             update_option('woocommerce_enable_guest_checkout', 'no');
 
-            // ✅ Permitir criar conta durante o checkout
+            // ✅ Permitir criar conta durante o checkout (opção atual)
+            update_option('woocommerce_enable_signup_and_login_from_checkout', 'yes');
+
+            // ✅ Fallback legado (não atrapalha se não for usado)
             update_option('woocommerce_enable_checkout_registration', 'yes');
 
             // ✅ Permitir criar conta na página Minha Conta
