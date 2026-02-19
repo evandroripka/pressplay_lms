@@ -276,17 +276,34 @@ class MLB_LMS_Frontend
         self::header('Aula - Malibu');
         echo '<div class="mlb-container"><div class="mlb-card">';
 
-        $video = get_post_meta($lesson->ID, '_mlb_lesson_video_url', true);
+        $video_url = get_post_meta($lesson->ID, '_mlb_lesson_video_url', true);
+        $vimeo_id  = (int) get_post_meta($lesson->ID, '_mlb_lesson_vimeo_id', true);
+
         $materials = get_post_meta($lesson->ID, '_mlb_lesson_materials', true);
         if (!is_array($materials)) $materials = [];
 
         echo '<a class="mlb-link" href="' . esc_url(home_url('/curso/' . $course_slug)) . '">← Voltar para o curso</a>';
         echo '<h1 class="mlb-title" style="margin-top:10px;">' . esc_html($lesson->post_title) . '</h1>';
 
-        if ($video) {
-            $embed = wp_oembed_get($video);
+        // ============================
+        // VIDEO RENDER (Vimeo API first)
+        // ============================
+        $rendered_video = false;
+
+        if ($vimeo_id && class_exists('MLB_LMS_Vimeo')) {
+            $html = MLB_LMS_Vimeo::get_embed_html($vimeo_id);
+            if ($html) {
+                echo '<div style="margin:16px 0;">' . $html . '</div>';
+                $rendered_video = true;
+            }
+        }
+
+        // fallback: oEmbed (YouTube / Vimeo público)
+        if (!$rendered_video && $video_url) {
+            $embed = wp_oembed_get($video_url);
             if ($embed) {
                 echo '<div style="margin:16px 0;">' . $embed . '</div>';
+                $rendered_video = true;
             } else {
                 echo '<p class="mlb-muted">Vídeo informado, mas não foi possível gerar o player.</p>';
             }
