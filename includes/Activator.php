@@ -2,47 +2,68 @@
 if (!defined('ABSPATH')) exit;
 
 class MLB_LMS_Activator {
+
     public static function activate() {
-        // Cria/atualiza tabelas
+
+        // ===============================
+        // Banco de dados
+        // ===============================
         MLB_LMS_Database::migrate();
 
-        // Cria papéis de usuário
+        // ===============================
+        // Roles
+        // ===============================
         MLB_LMS_Roles::add_roles();
 
-        // Registra CPTs antes do flush
+        // ===============================
+        // Registrar CPTs antes do flush
+        // ===============================
         if (class_exists('MLB_LMS_CPT')) {
             MLB_LMS_CPT::register_course();
             MLB_LMS_CPT::register_lesson();
         }
 
-        // Regras personalizadas
+        // ===============================
+        // Rewrite custom
+        // ===============================
         if (class_exists('MLB_LMS_Rewrite')) {
             MLB_LMS_Rewrite::add_rules();
         }
 
-        // Ajustes globais do WP (cadastro + role padrão)
-        self::configure_wp_registration_defaults();
-
-        // Flush das rewrite rules
-        flush_rewrite_rules();
-    }
-
-    private static function configure_wp_registration_defaults() {
-        // Salva valores antigos 1x (pra você poder restaurar manualmente depois, se quiser)
-        if (get_option('mlb_lms_prev_users_can_register', null) === null) {
-            add_option('mlb_lms_prev_users_can_register', get_option('users_can_register', 0));
-        }
-        if (get_option('mlb_lms_prev_default_role', null) === null) {
-            add_option('mlb_lms_prev_default_role', get_option('default_role', 'subscriber'));
-        }
-
-        // Habilita cadastro público
+        // ===============================
+        // WordPress: permitir registro público
+        // ===============================
         update_option('users_can_register', 1);
 
-        // Define role padrão como aluno (somente se a role existir)
-        $role = 'malibu_student';
-        if (get_role($role)) {
-            update_option('default_role', $role);
+        if (get_role('malibu_student')) {
+            update_option('default_role', 'malibu_student');
         }
+
+        // ===============================
+        // WooCommerce Account Settings
+        // ===============================
+        if (class_exists('WooCommerce')) {
+
+            // Backup das configs atuais (caso queira restaurar no futuro)
+            update_option('mlb_lms_backup_guest_checkout', get_option('woocommerce_enable_guest_checkout'));
+            update_option('mlb_lms_backup_checkout_account_creation', get_option('woocommerce_enable_checkout_login_reminder'));
+            update_option('mlb_lms_backup_myaccount_registration', get_option('woocommerce_enable_myaccount_registration'));
+            update_option('mlb_lms_backup_checkout_registration', get_option('woocommerce_enable_checkout_registration'));
+
+            // ❌ Desabilita checkout de convidado
+            update_option('woocommerce_enable_guest_checkout', 'no');
+
+            // ✅ Permitir criar conta durante o checkout
+            update_option('woocommerce_enable_checkout_registration', 'yes');
+
+            // ✅ Permitir criar conta na página Minha Conta
+            update_option('woocommerce_enable_myaccount_registration', 'yes');
+
+            // ✅ Enviar link de configuração de senha
+            update_option('woocommerce_registration_generate_password', 'yes');
+        }
+
+        // Flush final
+        flush_rewrite_rules();
     }
 }
