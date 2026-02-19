@@ -1,136 +1,169 @@
 # 🎓 Pressplay LMS
 
-A lightweight and powerful WordPress LMS plugin designed to simplify course sales and student management — built with performance, flexibility and Brazilian payment gateways in mind.
+A lightweight WordPress LMS plugin focused on clean architecture, WooCommerce integration and controlled course access.
 
-> Our mission is to provide a free, modern and developer-friendly LMS solution for the WordPress community.
-
----
-
-## 🚀 Why Pressplay LMS?
-
-Most LMS plugins are either:
-- Overcomplicated
-- Expensive
-- Bloated with features most creators don’t need
-
-Pressplay LMS focuses on:
-
-✔ Simple course structure  
-✔ Clean architecture  
-✔ Full control over UI  
-✔ Brazilian checkout transparency support  
-✔ Developer-first approach  
+Built for performance, extensibility and real-world Brazilian payment flows.
 
 ---
 
-## ✨ Core Features (v1 Roadmap)
+## 🚀 Current Version (v0.1.x)
 
-### 📚 Course Management
-- Create unlimited courses
-- Create lessons inside each course
-- Attach materials per lesson or per course:
-  - PDFs
-  - External links
-  - Downloadable files
-  - Custom notes
+Pressplay LMS currently provides:
 
-### 👨‍🎓 Student Management
-- Custom student role automatically created
-- Custom student registration fields:
+### 📚 Course System
+- Custom Post Type: Courses (mlb_course)
+- Custom Post Type: Lessons (mlb_lesson)
+- Course → Lesson relationship via post meta
+- Custom frontend rendering (no theme dependency)
+- Clean URL structure:
+  - /curso/{course-slug}
+  - /curso/{course-slug}/aula/{lesson-slug}
+
+---
+
+### 👨‍🎓 Student System
+- Custom role: `malibu_student`
+- Custom registration form via shortcode `[mlb_register]`
+- Extra student fields:
   - Full name
-  - Phone number (with DDD)
-  - Valid email
-- Course access controlled via enrollment
-- Automatic expiration (1-year access)
-
-### 💳 Payments
-- Transparent checkout integration
-- Designed to work with:
-  - Mercado Pago
-  - PagSeguro
-- Payment plugin independent (LMS handles logic, gateway handles transaction)
-
-### 📈 Learning Progress
-- Track lesson completion per student
-- Course progress percentage
-- Automatic course completion detection
-
-### 🏆 Certificates
-- Auto-generate certificate when:
-  - All lessons marked as completed
-- Certificate sent via email
-- Customizable email template with logo support
-
-### 🔐 Video Protection
-- Vimeo embed only
-- No direct download access
-- Frontend protection layer
+  - Phone
+- Automatic email with "set password" link
+- Student profile stored in custom table
 
 ---
 
-## 🎨 UI Philosophy
-
-Pressplay LMS does not rely on WordPress default UI.
-
-- Custom dashboard area
-- Custom admin screens
-- SVG icon support
-- Dedicated CSS namespace
-- Modern component-based styling
-
----
-
-## 🛠 Technical Stack
-
-- PHP 8+
-- WordPress Hooks API
-- Custom Post Types
-- Custom Roles
-- Custom Capabilities
-- REST-ready architecture (future)
-- Object-oriented plugin structure
+### 💳 WooCommerce Integration
+- Course automatically linked to WooCommerce product
+- Enrollment button shown when user is not enrolled
+- Redirect to WooCommerce checkout
+- Automatic enrollment on order completion
+- Enrollment expiration supported
+- Access control based on:
+  - Logged-in status
+  - Enrollment active status
+  - Expiration date
+  - Administrator bypass
 
 ---
 
-## 📂 Plugin Structure
+### 🔐 Access Control
+- Lessons visible only to:
+  - Enrolled students (active enrollment)
+  - Administrators
+- Expired enrollments block lesson access
+- Course page displays "Matricular" button when access is restricted
+
+---
+
+### 🧱 Database Layer
+Custom tables:
+
+- `wp_mlb_students`
+- `wp_mlb_enrollments`
+- `wp_mlb_progress`
+
+Enrollment table supports:
+- Status
+- Provider reference
+- Expiration date
+- Order reference
+
+---
+
+### ⚙ Automatic WordPress Configuration
+
+On activation the plugin:
+
+- Creates custom roles
+- Registers CPTs
+- Registers custom rewrite rules
+- Flushes rewrite rules
+- Enables public user registration
+- Sets default role to `malibu_student`
+
+This ensures zero manual configuration required.
+
+---
+
+## 🛠 Architecture
+
+- Object-oriented structure
+- Hook-based integration
+- WooCommerce order hooks
+- Custom rewrite system
+- Custom frontend rendering (template_include)
+- Clean separation of:
+  - CPT
+  - Roles
+  - Enrollment logic
+  - Woo integration
+  - Frontend rendering
+  - Database layer
+
+---
+
+## 📂 Current Plugin Structure
 
 pressplay-lms/
 │
 ├── assets/
-│ ├── css/
-│ ├── js/
-│ └── svg/
+│   ├── css/
+│   └── js/
 │
 ├── includes/
-│ ├── class-cpt.php
-│ ├── class-roles.php
-│ ├── class-enrollment.php
-│ ├── class-progress.php
-│ ├── class-certificate.php
-│ └── class-payment-handler.php
+│   ├── Activator.php
+│   ├── Deactivator.php
+│   ├── CPT.php
+│   ├── Database.php
+│   ├── Dependencies.php
+│   ├── Enrollments.php
+│   ├── Frontend.php
+│   ├── Helpers.php
+│   ├── Mailer.php
+│   ├── Metabox_Course.php
+│   ├── Metabox_Lesson.php
+│   ├── Rewrite.php
+│   ├── Roles.php
+│   ├── Settings.php
+│   ├── Templates.php
+│   └── Woo.php
 │
 ├── malibu-lms.php
 ├── uninstall.php
 └── README.md
 
+---
+
+## 📌 Roadmap
+
+Planned next improvements:
+
+- Improved progress tracking
+- Certificate generation
+- Real admin dashboard for enrollments
+- Better settings UI
+- Anti-spam protection on registration
+- REST API endpoints
+- Improved sanitization & validation
 
 ---
 
 ## 🌎 Vision
 
-Pressplay LMS aims to:
+Pressplay LMS aims to be:
 
-- Empower independent course creators
-- Provide a free alternative for emerging markets
-- Deliver clean code and extensibility
-- Strengthen the open-source WordPress ecosystem
+- Developer-first
+- Lightweight
+- WooCommerce-native
+- Cleanly extensible
+- Open-source friendly
 
 ---
 
 ## 🤝 Contributing
 
 Pull requests are welcome.  
-Let’s build something meaningful for the WordPress community.
+Let's build a modern and clean LMS for the WordPress ecosystem.
 
 ---
 
