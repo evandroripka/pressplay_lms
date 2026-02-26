@@ -1,0 +1,246 @@
+/* assets/css/presslms-lesson.css */
+
+.presslms-lesson {
+  background: var(--pl-bg);
+  min-height: 100vh;
+}
+
+/* Topbar */
+.presslms-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.presslms-topbar__left {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.presslms-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.presslms-back:hover {
+  background: var(--pl-surface-2);
+}
+
+/* Layout */
+.presslms-title { display: flex; flex-direction: column; gap: 10px; }
+.presslms-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.presslms-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 18px;
+  align-items: start;
+}
+
+.presslms-main { display: grid; gap: 18px; }
+.presslms-aside { display: grid; gap: 18px; }
+
+.presslms-aside__sticky {
+  /* position: sticky; */
+  top: 18px;
+}
+
+/* Player */
+.presslms-player { padding: 12px; }
+
+.presslms-player__ratio {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--pl-radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--pl-border);
+  background: #000; /* evita flash branco durante load */
+}
+
+/* Iframe sempre 100% */
+.presslms-player__ratio iframe {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  display: block;
+}
+
+/* Wrappers comuns */
+.presslms-player__ratio > div,
+.presslms-player__ratio .wp-video,
+.presslms-player__ratio .fluid-width-video-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Se tiver iframe dentro do wrapper */
+.presslms-player__ratio > div iframe,
+.presslms-player__ratio .wp-video iframe,
+.presslms-player__ratio .fluid-width-video-wrapper iframe {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Instructor */
+.presslms-instructor {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.presslms-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 1px solid var(--pl-border);
+  background: linear-gradient(135deg, #dbeafe, #e0f2fe); /* azul suave */
+}
+
+.presslms-social {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.presslms-iconlink {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--pl-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pl-text);
+  background: var(--pl-surface);
+  text-decoration: none;
+}
+
+.presslms-iconlink:hover {
+  background: var(--pl-surface-2);
+}
+
+/* Materiais */
+.presslms-materials {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.presslms-materials__item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: 14px;
+  background: var(--pl-surface);
+}
+
+.presslms-materials__item:hover {
+  background: var(--pl-surface-2);
+}
+
+.presslms-materials__icon { opacity: .85; }
+.presslms-materials__link { color: var(--pl-text); text-decoration: none; }
+.presslms-materials__link:hover { text-decoration: underline; }
+
+/* Lista de aulas */
+.presslms-lessons {
+  display: grid;
+  gap: 8px;
+}
+
+.presslms-lessons__item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+}
+
+.presslms-lessons__item:hover {
+  background: var(--pl-surface-2);
+}
+
+.presslms-lessons__item span {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pl-muted);
+  flex: 0 0 28px;
+}
+
+/* Active aula (azul clean) */
+.presslms-lessons__item.is-active {
+  border-color: #93c5fd;               /* azul claro */
+  background: #eff6ff;                /* fundo azul bem suave */
+}
+
+.presslms-lessons__item.is-active span {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+/* Related */
+.presslms-related__item {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: 16px;
+  background: var(--pl-surface);
+}
+
+.presslms-related__item:hover {
+  background: var(--pl-surface-2);
+}
+
+.presslms-thumb {
+  width: 72px;
+  height: 54px;
+  border-radius: 14px;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-2);
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .presslms-layout { grid-template-columns: 1fr; }
+  .presslms-aside__sticky { position: static; }
+  .presslms-topbar { flex-direction: column; align-items: stretch; }
+  .presslms-topbar__left { flex-direction: column; }
+}
