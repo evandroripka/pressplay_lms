@@ -129,6 +129,16 @@ if (!function_exists('presslms_format_seconds')) {
           <div class="presslms-instructor">
             <div class="presslms-avatar" aria-hidden="true"></div>
             <div>
+              <?php
+              $course_teacher = (int) get_post_meta($course->ID, '_press_course_teacher', true);
+              $lesson_teacher = (int) get_post_meta($lesson->ID, '_press_lesson_teacher', true);
+              $teacher_id = $lesson_teacher ?: $course_teacher;
+
+              if ($teacher_id) {
+                $teacher = get_post($teacher_id);
+                echo '<h3>Instrutor: ' . esc_html($teacher->post_title) . '</h3>';
+              }
+              ?>
               <div class="presslms-strong">[Nome do Instrutor]</div>
               <div class="presslms-muted">[Cargo / Bio curta]</div>
 

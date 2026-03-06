@@ -25,11 +25,18 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
         <div class="presslms-course-hero__meta">
           <span class="presslms-chip">
             <i class="fa-light fa-circle-info"></i>
-            Última atualização: <b><?php echo esc_html( get_the_modified_date('d/m/Y', $course) ); ?></b>
+            Última atualização: <b><?php echo esc_html(get_the_modified_date('d/m/Y', $course)); ?></b>
           </span>
+          <?php
+          $teacher_id = (int) get_post_meta($course->ID, '_press_course_teacher', true);
+          if ($teacher_id) {
+            $teacher = get_post($teacher_id);
+            echo '<h3>Instrutor: ' . esc_html($teacher->post_title) . '</h3>';
+          }
+          ?>
           <span class="presslms-chip">
             <i class="fa-light fa-layer-group"></i>
-            <b><?php echo esc_html( count($lessons) ); ?></b> aulas
+            <b><?php echo esc_html(count($lessons)); ?></b> aulas
           </span>
         </div>
         <div class="presslms-course-hero__about presslms-card">
@@ -48,7 +55,7 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
             <p class="presslms-muted">Nenhuma aula cadastrada ainda.</p>
           <?php else: ?>
             <div class="presslms-course-lessons">
-              <?php foreach ($lessons as $idx => $lesson): 
+              <?php foreach ($lessons as $idx => $lesson):
                 $lesson_url = home_url('/curso/' . $course_slug . '/aula/' . $lesson->post_name . '/');
               ?>
                 <a class="presslms-course-lessons__item" href="<?php echo esc_url($lesson_url); ?>">
@@ -67,16 +74,16 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
         <section class="presslms-card presslms-course-side">
           <div class="presslms-course-side__media">
             <?php
-              if ($trailer) {
-                $embed = wp_oembed_get($trailer);
-                if ($embed) {
-                  echo '<div class="presslms-course-side__ratio">' . $embed . '</div>';
-                } else {
-                  echo '<div class="presslms-course-side__placeholder">TRAILER DO CURSO</div>';
-                }
+            if ($trailer) {
+              $embed = wp_oembed_get($trailer);
+              if ($embed) {
+                echo '<div class="presslms-course-side__ratio">' . $embed . '</div>';
               } else {
                 echo '<div class="presslms-course-side__placeholder">TRAILER DO CURSO</div>';
               }
+            } else {
+              echo '<div class="presslms-course-side__placeholder">TRAILER DO CURSO</div>';
+            }
             ?>
           </div>
           <div class="presslms-course-side__cta">

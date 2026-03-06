@@ -163,7 +163,18 @@ class PRESS_LMS_Lesson_Meta
         } else {
             echo '<p style="margin:6px 0;color:#666">Cole uma URL do Vimeo e salve a aula para validar via API (se token estiver configurado).</p>';
         }
+        $course_id = (int) get_post_meta($post->ID, '_press_lesson_course_id', true);
+        $default_teacher = (int) get_post_meta($course_id, '_press_course_teacher', true);
+        $lesson_teacher = (int) get_post_meta($post->ID, '_press_lesson_teacher', true);
 
+        echo '<label for="press_lesson_teacher">Professor da aula</label>';
+        echo '<select name="press_lesson_teacher" id="press_lesson_teacher" class="widefat">';
+        echo '<option value="">Usar professor do curso (' . get_the_title($default_teacher) . ')</option>';
+        foreach ($teachers as $teacher) {
+            $selected = selected($lesson_teacher, $teacher->ID, false);
+            echo '<option value="' . esc_attr($teacher->ID) . '"' . $selected . '>' . esc_html($teacher->post_title) . '</option>';
+        }
+        echo '</select>';
         echo '</div>';
 
         // ==========================
@@ -616,7 +627,9 @@ class PRESS_LMS_Lesson_Meta
             $items = PRESS_LMS_Materials::normalize_items($items);
             if (is_array($items)) $items = array_values($items);
         }
-
+        if (isset($_POST['press_lesson_teacher'])) {
+            update_post_meta($post_id, '_press_lesson_teacher', (int) $_POST['press_lesson_teacher']);
+        }
         update_post_meta($post_id, self::META_MATERIALS, $items);
 
         // ==========================

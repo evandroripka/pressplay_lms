@@ -57,6 +57,23 @@ class PRESS_LMS_Course_Meta
 
         echo '<hr>';
         echo '<p style="color:#666">MVP: Galeria de imagens podemos fazer depois (Media Uploader). Primeiro vamos fechar curso/aulas/materiais.</p>';
+
+        // Carrega todos os professores cadastrados
+        $teachers = get_posts([
+            'post_type' => 'press_teacher',
+            'posts_per_page' => -1,
+            'post_status' => 'publish'
+        ]);
+
+        $selected_teacher = (int) get_post_meta($post->ID, '_press_course_teacher', true);
+        echo '<label for="press_course_teacher">Professor do curso</label>';
+        echo '<select name="press_course_teacher" id="press_course_teacher" class="widefat">';
+        echo '<option value="">— Selecionar —</option>';
+        foreach ($teachers as $teacher) {
+            $selected = selected($selected_teacher, $teacher->ID, false);
+            echo '<option value="' . esc_attr($teacher->ID) . '"' . $selected . '>' . esc_html($teacher->post_title) . '</option>';
+        }
+        echo '</select>';
     }
 
     public static function save($post_id, $post)
@@ -80,7 +97,9 @@ class PRESS_LMS_Course_Meta
         if (isset($_POST['press_course_trailer'])) {
             update_post_meta($post_id, '_press_course_trailer', esc_url_raw($_POST['press_course_trailer']));
         }
-
+        if (isset($_POST['press_course_teacher'])) {
+            update_post_meta($post_id, '_press_course_teacher', (int) $_POST['press_course_teacher']);
+        }
         // ❌ Removido: salvar product_id manualmente
         // Isso agora é responsabilidade do PRESS_LMS_Woo (criação automática).
     }
