@@ -40,6 +40,7 @@ require_once PRESS_LMS_PATH . 'includes/Enrollments.php';
 require_once PRESS_LMS_PATH . 'includes/Actions.php';
 require_once PRESS_LMS_PATH . 'includes/Vimeo.php';
 require_once PRESS_LMS_PATH . 'includes/class-presslms-assets.php';
+require_once PRESS_LMS_PATH . 'includes/Duration.php';
 
 // Hooks ativação
 register_activation_hook(__FILE__, ['PRESS_LMS_Activator', 'activate']);

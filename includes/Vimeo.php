@@ -105,4 +105,26 @@ class PRESS_LMS_Vimeo
             <iframe src="' . esc_url($src) . '" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
         </div>';
     }
+
+    public static function get_video_duration_seconds(int $video_id): int
+    {
+        $data = self::get_video_data($video_id);
+        if (is_wp_error($data)) return 0;
+
+        $duration = isset($data['duration']) ? (int) $data['duration'] : 0; // seconds
+        return max(0, $duration);
+    }
+
+    /**
+     * Útil para cache: o Vimeo retorna modified_time (ISO datetime).
+     * Se mudar, sabemos que o vídeo foi alterado (troca/edição) e dá pra refazer cache.
+     */
+    public static function get_video_modified_time(int $video_id): string
+    {
+        $data = self::get_video_data($video_id);
+        if (is_wp_error($data)) return '';
+
+        $t = isset($data['modified_time']) ? (string) $data['modified_time'] : '';
+        return trim($t);
+    }
 }

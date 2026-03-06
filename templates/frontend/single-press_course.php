@@ -17,26 +17,21 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
   $buy_url = add_query_arg('add-to-cart', $product_id, wc_get_cart_url());
 }
 ?>
-
 <div class="presslms presslms-course" data-presslms-page="course">
   <div class="presslms__container">
-
     <header class="presslms-course-hero">
       <div class="presslms-course-hero__left">
-        <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?></h1>
-
+        <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?> 2</h1>
         <div class="presslms-course-hero__meta">
           <span class="presslms-chip">
             <i class="fa-light fa-circle-info"></i>
             Última atualização: <b><?php echo esc_html( get_the_modified_date('d/m/Y', $course) ); ?></b>
           </span>
-
           <span class="presslms-chip">
             <i class="fa-light fa-layer-group"></i>
             <b><?php echo esc_html( count($lessons) ); ?></b> aulas
           </span>
         </div>
-
         <div class="presslms-course-hero__about presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2"><i class="fa-light fa-bullseye-arrow"></i> O que você aprenderá</h2>
@@ -45,12 +40,10 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
             <?php echo apply_filters('the_content', $course->post_content); ?>
           </div>
         </div>
-
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2"><i class="fa-light fa-list-check"></i> Conteúdo do curso</h2>
           </div>
-
           <?php if (!$lessons || count($lessons) === 0): ?>
             <p class="presslms-muted">Nenhuma aula cadastrada ainda.</p>
           <?php else: ?>
@@ -69,11 +62,8 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
             </div>
           <?php endif; ?>
         </section>
-
       </div>
-
       <aside class="presslms-course-hero__right">
-
         <section class="presslms-card presslms-course-side">
           <div class="presslms-course-side__media">
             <?php
@@ -89,8 +79,6 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
               }
             ?>
           </div>
-
-          
           <div class="presslms-course-side__cta">
             <?php if ($can_access && $first_lesson_url): ?>
               <a class="presslms-btn presslms-btn--primary presslms-course-side__btn" href="<?php echo esc_url($first_lesson_url); ?>">
@@ -107,7 +95,6 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
               <?php endif; ?>
             <?php endif; ?>
           </div>
-
           <div class="presslms-course-side__includes">
             <div class="presslms-course-side__includes-title">Este curso inclui:</div>
             <ul class="presslms-course-side__list">
@@ -118,9 +105,7 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
             </ul>
           </div>
         </section>
-
       </aside>
     </header>
-
   </div>
 </div>

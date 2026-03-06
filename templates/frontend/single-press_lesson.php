@@ -28,7 +28,8 @@ $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', tr
 $course_duration = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
 
 if (!function_exists('presslms_format_seconds')) {
-  function presslms_format_seconds($seconds): string {
+  function presslms_format_seconds($seconds): string
+  {
     $seconds = max(0, (int)$seconds);
     $h = intdiv($seconds, 3600);
     $m = intdiv($seconds % 3600, 60);
@@ -44,7 +45,7 @@ if (!function_exists('presslms_format_seconds')) {
 
     <header class="presslms-topbar">
       <div class="presslms-topbar__left">
-<!--         <a class="presslms-back" href="<?php echo esc_url(home_url('/curso/' . $course_slug)); ?>">
+        <!--         <a class="presslms-back" href="<?php echo esc_url(home_url('/curso/' . $course_slug)); ?>">
           <i class="fa-light fa-arrow-left-long"></i>
           <span>Voltar para o curso</span>
         </a>
@@ -167,7 +168,7 @@ if (!function_exists('presslms_format_seconds')) {
               ?>
                 <li class="presslms-materials__item">
                   <i class="presslms-materials__icon fa-light fa-file-lines"></i>
-                  <a class="presslms-materials__link" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer"<?php echo $download_attr; ?>>
+                  <a class="presslms-materials__link" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer" <?php echo $download_attr; ?>>
                     <?php echo esc_html($name !== '' ? $name : $url); ?>
                   </a>
                 </li>
@@ -188,12 +189,37 @@ if (!function_exists('presslms_format_seconds')) {
             </h2>
           </div>
 
+          <?php
+          // ---------------------------------------------------------
+          // Sidebar: lista real de aulas do curso
+          // ---------------------------------------------------------
+          $lessons_list = get_posts([
+            'post_type'      => 'press_lesson',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'meta_key'       => '_press_lesson_course_id',
+            'meta_value'     => (int) $course->ID,
+            'orderby'        => 'menu_order title', // se você usar menu_order, ele respeita
+            'order'          => 'ASC',
+          ]);
+
+          $current_lesson_id = (int) $lesson->ID;
+          ?>
+
           <nav class="presslms-lessons">
-            <a class="presslms-lessons__item is-active" href="#"><span>1.</span> Introdução</a>
-            <a class="presslms-lessons__item" href="#"><span>2.</span> Configuração</a>
-            <a class="presslms-lessons__item" href="#"><span>3.</span> Projeto</a>
-            <a class="presslms-lessons__item" href="#"><span>4.</span> Testes</a>
-            <a class="presslms-lessons__item" href="#"><span>5.</span> Deploy</a>
+            <?php if (!$lessons_list): ?>
+              <div class="presslms-muted">Nenhuma aula cadastrada ainda.</div>
+            <?php else: ?>
+              <?php foreach ($lessons_list as $i => $l):
+                $url = home_url('/curso/' . $course_slug . '/aula/' . $l->post_name . '/');
+                $active = ((int)$l->ID === $current_lesson_id) ? ' is-active' : '';
+              ?>
+                <a class="presslms-lessons__item<?php echo esc_attr($active); ?>" href="<?php echo esc_url($url); ?>">
+                  <span><?php echo esc_html($i + 1); ?>.</span>
+                  <?php echo esc_html($l->post_title); ?>
+                </a>
+              <?php endforeach; ?>
+            <?php endif; ?>
           </nav>
         </section>
 

@@ -14,6 +14,99 @@ class PRESS_LMS_Actions
         // Faz o WooCommerce respeitar redirect_to no login/registro
         add_filter('woocommerce_login_redirect', [__CLASS__, 'woo_login_redirect'], 10, 2);
         add_filter('woocommerce_registration_redirect', [__CLASS__, 'woo_registration_redirect'], 10, 1);
+
+        add_action('save_post_press_lesson', function ($post_id, $post, $update) {
+
+            // Segurança básica
+            if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) return;
+            if (!$post || !($post instanceof WP_Post)) return;
+
+            $post_id = (int) $post_id;
+
+            // Só quando for publish (evita calcular em rascunho/auto-draft)
+            if ($post->post_status !== 'publish') return;
+
+            // Evita rodar em update em massa rápido / loops (rate limit simples)
+            // Ex.: se salvar 10x seguidos, não fica batendo no Vimeo.
+            $rate_key = 'presslms_vimeo_duration_lock_' . $post_id;
+            if (get_transient($rate_key)) {
+                // Mesmo com lock, ainda recalcula total do curso se já tiver duration salva (opcional)
+                $course_id = (int) get_post_meta($post_id, '_press_lesson_course_id', true);
+                if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
+                    PRESSLMS_Duration::recalc_course_total_duration($course_id);
+                }
+                return;
+            }
+            set_transient($rate_key, 1, 30); // 30s de cooldown
+
+            // Curso vinculado
+            $course_id = (int) get_post_meta($post_id, '_press_lesson_course_id', true);
+
+            // Vimeo id
+            $vimeo_id = (int) get_post_meta($post_id, '_press_lesson_vimeo_id', true);
+
+            // Cache local
+            $cached_vimeo_id   = (int) get_post_meta($post_id, '_press_lesson_vimeo_id_cached', true);
+            $cached_modified   = (string) get_post_meta($post_id, '_press_lesson_vimeo_modified_cached', true);
+            $current_duration  = (int) get_post_meta($post_id, '_press_lesson_duration', true);
+
+            // Se não tem Vimeo -> zera duration + recalcula curso
+            if ($vimeo_id <= 0) {
+                update_post_meta($post_id, '_press_lesson_duration', 0);
+                update_post_meta($post_id, '_press_lesson_vimeo_id_cached', 0);
+                update_post_meta($post_id, '_press_lesson_vimeo_modified_cached', '');
+
+                if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
+                    PRESSLMS_Duration::recalc_course_total_duration($course_id);
+                }
+                return;
+            }
+
+            // Decide se precisa bater na API
+            $need_refresh = false;
+
+            // Mudou o vídeo
+            if ($cached_vimeo_id !== $vimeo_id) $need_refresh = true;
+
+            // Ainda não tem duration
+            if ($current_duration <= 0) $need_refresh = true;
+
+            // Se tem token e Vimeo class, checa modified_time (só quando necessário)
+            if (!$need_refresh && class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'has_token') && PRESS_LMS_Vimeo::has_token()) {
+                if (method_exists('PRESS_LMS_Vimeo', 'get_video_modified_time')) {
+                    $remote_modified = PRESS_LMS_Vimeo::get_video_modified_time($vimeo_id);
+                    if ($remote_modified && $remote_modified !== $cached_modified) {
+                        $need_refresh = true;
+                    }
+                }
+            }
+
+            // Atualiza duration via API
+            if ($need_refresh && class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'has_token') && PRESS_LMS_Vimeo::has_token()) {
+
+                $duration = 0;
+                $remote_modified = '';
+
+                if (method_exists('PRESS_LMS_Vimeo', 'get_video_duration_seconds')) {
+                    $duration = (int) PRESS_LMS_Vimeo::get_video_duration_seconds($vimeo_id);
+                }
+                if (method_exists('PRESS_LMS_Vimeo', 'get_video_modified_time')) {
+                    $remote_modified = (string) PRESS_LMS_Vimeo::get_video_modified_time($vimeo_id);
+                }
+
+                update_post_meta($post_id, '_press_lesson_duration', max(0, $duration));
+                update_post_meta($post_id, '_press_lesson_vimeo_id_cached', $vimeo_id);
+                update_post_meta($post_id, '_press_lesson_vimeo_modified_cached', $remote_modified);
+            } else {
+                // Sem token = não dá pra buscar; mantém duration atual e só recalcula curso
+                // (pelo menos não quebra)
+            }
+
+            // Recalcula total do curso
+            if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
+                PRESSLMS_Duration::recalc_course_total_duration($course_id);
+            }
+        }, 20, 3);
     }
 
     /**
@@ -166,5 +259,4 @@ class PRESS_LMS_Actions
         }
         return $redirect;
     }
-    
 }
