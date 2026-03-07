@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: Pressplay LMS
  * Description: LMS enxuto para cursos (Vimeo), matrícula, progresso e certificado.
@@ -13,7 +14,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-// ✅ Constantes padrão (sem repetição)
+// ✅ Constantes padrão
 define('PRESS_LMS_VERSION', '1.0.0');
 define('PRESS_LMS_FILE', __FILE__);
 define('PRESS_LMS_PATH', plugin_dir_path(__FILE__));
@@ -32,6 +33,7 @@ require_once PRESS_LMS_PATH . 'includes/Mailer.php';
 require_once PRESS_LMS_PATH . 'includes/Settings.php';
 require_once PRESS_LMS_PATH . 'includes/Helpers.php';
 require_once PRESS_LMS_PATH . 'includes/CPT.php';
+require_once PRESS_LMS_PATH . 'includes/CPT_Teacher.php';
 require_once PRESS_LMS_PATH . 'includes/Metabox_Course.php';
 require_once PRESS_LMS_PATH . 'includes/Metabox_Lesson.php';
 require_once PRESS_LMS_PATH . 'includes/Woo.php';
@@ -41,37 +43,37 @@ require_once PRESS_LMS_PATH . 'includes/Actions.php';
 require_once PRESS_LMS_PATH . 'includes/Vimeo.php';
 require_once PRESS_LMS_PATH . 'includes/class-presslms-assets.php';
 require_once PRESS_LMS_PATH . 'includes/Duration.php';
-
+require_once PRESS_LMS_PATH . 'includes/Metabox_Teacher.php';
 // Hooks ativação
 register_activation_hook(__FILE__, ['PRESS_LMS_Activator', 'activate']);
 register_deactivation_hook(__FILE__, ['PRESS_LMS_Deactivator', 'deactivate']);
 
 add_action('plugins_loaded', function () {
-  PRESSLMS_Assets::init();
-  PRESS_LMS_Dependencies::init();
-  PRESS_LMS_Settings::init();
-  PRESS_LMS_Roles::init();
-  PRESS_LMS_Rewrite::init();
-  PRESS_LMS_Frontend::init();
-  PRESS_LMS_CPT::init();
-  PRESS_LMS_Course_Meta::init();
-  PRESS_LMS_Lesson_Meta::init();
-  PRESS_LMS_Woo::init();
-  PRESS_LMS_Templates::init();
-  PRESS_LMS_Actions::init();
-
-  if (class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'init')) {
-    PRESS_LMS_Vimeo::init();
-  }
+    PRESSLMS_Assets::init();
+    PRESS_LMS_Dependencies::init();
+    PRESS_LMS_Settings::init();
+    PRESS_LMS_Roles::init();
+    PRESS_LMS_Rewrite::init();
+    PRESS_LMS_Frontend::init();
+    PRESS_LMS_CPT::init();
+    PRESSLMS_Teacher_CPT::init();
+    PRESS_LMS_Course_Meta::init();
+    PRESS_LMS_Lesson_Meta::init();
+    PRESS_LMS_Woo::init();
+    PRESS_LMS_Templates::init();
+    PRESS_LMS_Actions::init();
+    PRESS_LMS_Teacher_Meta::init();
+    if (class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'init')) {
+        PRESS_LMS_Vimeo::init();
+    }
 });
 
 // Admin CSS
 add_action('admin_enqueue_scripts', function () {
-  wp_enqueue_style('press-lms-admin', PRESS_LMS_URL . 'assets/css/admin.css', [], PRESS_LMS_VERSION);
+    wp_enqueue_style('press-lms-admin', PRESS_LMS_URL . 'assets/css/admin.css', [], PRESS_LMS_VERSION);
 });
 
-// Front app.css (se você quiser manter global, deixe assim)
-// Se quiser isolar só nas páginas do LMS, eu te passo abaixo.
+// Front app.css
 add_action('wp_enqueue_scripts', function () {
-  wp_enqueue_style('press-lms-app', PRESS_LMS_URL . 'assets/css/app.css', [], PRESS_LMS_VERSION);
+    wp_enqueue_style('press-lms-app', PRESS_LMS_URL . 'assets/css/app.css', [], PRESS_LMS_VERSION);
 }, 20);

@@ -27,6 +27,51 @@ if (class_exists('PRESS_LMS_Materials')) {
 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
 $course_duration = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
 
+// =====================================================
+// Instrutor da aula
+// prioridade:
+// 1. professor definido na aula
+// 2. professor definido no curso
+// =====================================================
+$course_teacher_id = (int) get_post_meta($course->ID, '_press_course_teacher', true);
+$lesson_teacher_id = (int) get_post_meta($lesson->ID, '_press_lesson_teacher', true);
+
+$teacher_id = $lesson_teacher_id > 0 ? $lesson_teacher_id : $course_teacher_id;
+
+$teacher_name       = '';
+$teacher_profession = '';
+$teacher_bio        = '';
+$teacher_photo      = '';
+
+$teacher_instagram  = '';
+$teacher_facebook   = '';
+$teacher_x          = '';
+$teacher_linkedin   = '';
+$teacher_website    = '';
+$teacher_behance    = '';
+$teacher_pinterest  = '';
+$teacher_email      = '';
+
+if ($teacher_id > 0) {
+  $teacher_post = get_post($teacher_id);
+
+  if ($teacher_post && $teacher_post->post_type === 'press_teacher') {
+    $teacher_name       = get_the_title($teacher_id);
+    $teacher_profession = (string) get_post_meta($teacher_id, '_press_teacher_profession', true);
+    $teacher_bio        = (string) get_post_field('post_content', $teacher_id);
+    $teacher_photo      = get_the_post_thumbnail_url($teacher_id, 'medium');
+
+    $teacher_instagram  = (string) get_post_meta($teacher_id, '_press_teacher_instagram', true);
+    $teacher_facebook   = (string) get_post_meta($teacher_id, '_press_teacher_facebook', true);
+    $teacher_x          = (string) get_post_meta($teacher_id, '_press_teacher_x', true);
+    $teacher_linkedin   = (string) get_post_meta($teacher_id, '_press_teacher_linkedin', true);
+    $teacher_website    = (string) get_post_meta($teacher_id, '_press_teacher_website', true);
+    $teacher_behance    = (string) get_post_meta($teacher_id, '_press_teacher_behance', true);
+    $teacher_pinterest  = (string) get_post_meta($teacher_id, '_press_teacher_pinterest', true);
+    $teacher_email      = (string) get_post_meta($teacher_id, '_press_teacher_email', true);
+  }
+}
+
 if (!function_exists('presslms_format_seconds')) {
   function presslms_format_seconds($seconds): string
   {
@@ -118,6 +163,7 @@ if (!function_exists('presslms_format_seconds')) {
           </div>
         </section>
 
+       
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -126,29 +172,99 @@ if (!function_exists('presslms_format_seconds')) {
             </h2>
           </div>
 
-          <div class="presslms-instructor">
-            <div class="presslms-avatar" aria-hidden="true"></div>
-            <div>
-              <?php
-              $course_teacher = (int) get_post_meta($course->ID, '_press_course_teacher', true);
-              $lesson_teacher = (int) get_post_meta($lesson->ID, '_press_lesson_teacher', true);
-              $teacher_id = $lesson_teacher ?: $course_teacher;
+          <?php if ($teacher_id > 0 && $teacher_name !== ''): ?>
+            <div class="presslms-instructor">
 
-              if ($teacher_id) {
-                $teacher = get_post($teacher_id);
-                echo '<h3>Instrutor: ' . esc_html($teacher->post_title) . '</h3>';
-              }
-              ?>
-              <div class="presslms-strong">[Nome do Instrutor]</div>
-              <div class="presslms-muted">[Cargo / Bio curta]</div>
+              <?php if ($teacher_photo): ?>
+                <div class="presslms-avatar presslms-avatar--image">
+                  <img src="<?php echo esc_url($teacher_photo); ?>" alt="<?php echo esc_attr($teacher_name); ?>">
+                </div>
+              <?php else: ?>
+                <div class="presslms-avatar" aria-hidden="true"></div>
+              <?php endif; ?>
 
-              <div class="presslms-social">
-                <a class="presslms-iconlink" href="#"><i class="fa-brands fa-instagram"></i></a>
-                <a class="presslms-iconlink" href="#"><i class="fa-brands fa-linkedin-in"></i></a>
-                <a class="presslms-iconlink" href="#"><i class="fa-brands fa-x-twitter"></i></a>
+              <div class="presslms-instructor__content">
+                <div class="presslms-strong"><?php echo esc_html($teacher_name); ?></div>
+
+                <?php if ($teacher_profession): ?>
+                  <div class="presslms-muted"><?php echo esc_html($teacher_profession); ?></div>
+                <?php endif; ?>
+
+                <?php if ($teacher_bio): ?>
+                  <div class="presslms-instructor__bio">
+                    <?php echo wp_kses_post(wpautop($teacher_bio)); ?>
+                  </div>
+                <?php endif; ?>
+
+                <?php
+                $has_social =
+                  $teacher_instagram ||
+                  $teacher_facebook ||
+                  $teacher_x ||
+                  $teacher_linkedin ||
+                  $teacher_website ||
+                  $teacher_behance ||
+                  $teacher_pinterest ||
+                  $teacher_email;
+                ?>
+
+                <?php if ($has_social): ?>
+                  <div class="presslms-social">
+                    <?php if ($teacher_instagram): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_instagram); ?>" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                        <i class="fa-brands fa-instagram"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_facebook): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_facebook); ?>" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                        <i class="fa-brands fa-facebook-f"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_x): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_x); ?>" target="_blank" rel="noopener noreferrer" aria-label="X">
+                        <i class="fa-brands fa-x-twitter"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_linkedin): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_linkedin); ?>" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+                        <i class="fa-brands fa-linkedin-in"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_website): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_website); ?>" target="_blank" rel="noopener noreferrer" aria-label="Website">
+                        <i class="fa-light fa-globe"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_behance): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_behance); ?>" target="_blank" rel="noopener noreferrer" aria-label="Behance">
+                        <i class="fa-brands fa-behance"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_pinterest): ?>
+                      <a class="presslms-iconlink" href="<?php echo esc_url($teacher_pinterest); ?>" target="_blank" rel="noopener noreferrer" aria-label="Pinterest">
+                        <i class="fa-brands fa-pinterest-p"></i>
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($teacher_email): ?>
+                      <a class="presslms-iconlink" href="mailto:<?php echo antispambot(esc_attr($teacher_email)); ?>" aria-label="E-mail">
+                        <i class="fa-light fa-envelope"></i>
+                      </a>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
               </div>
             </div>
-          </div>
+
+          <?php else: ?>
+            <p class="presslms-muted">Nenhum instrutor definido para esta aula.</p>
+          <?php endif; ?>
         </section>
 
         <section class="presslms-card">

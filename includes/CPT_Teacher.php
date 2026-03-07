@@ -21,8 +21,8 @@ class PRESSLMS_Teacher_CPT {
             'labels' => $labels,
             'public' => true,
             'has_archive' => false,
-            'show_in_menu' => true,
-            'supports' => ['title', 'editor', 'thumbnail'],
+            'show_in_menu' => false,
+            'supports' => ['title', 'thumbnail'],
             'rewrite' => ['slug' => 'professor'],
         ];
 

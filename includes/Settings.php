@@ -32,7 +32,13 @@ class PRESS_LMS_Settings
             $icon_url,
             6
         );
-
+        add_submenu_page(
+            'press-lms', // menu pai = Pressplay LMS / Cursos
+            'Professores',                     // título da página
+            'Professores',                     // texto do menu
+            'edit_posts',                      // capability
+            'edit.php?post_type=press_teacher' // destino real
+        );
         add_submenu_page(
             'press-lms',
             'Configurações',
