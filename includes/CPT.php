@@ -23,7 +23,7 @@ class PRESS_LMS_CPT
             'show_ui' => true,
             'show_in_menu' => 'press-lms', // aparece dentro do menu Pressplay LMS
             'menu_icon' => 'dashicons-welcome-learn-more',
-            'supports' => ['title', 'editor', 'thumbnail'],
+            'supports' => ['title', 'editor', 'thumbnail', 'page-attributes'],
             'rewrite' => ['slug' => 'curso', 'with_front' => false],
             'has_archive' => false,
         ]);
@@ -41,8 +41,8 @@ class PRESS_LMS_CPT
             ],
             'public' => false,     // não expõe publicamente por padrão
             'show_ui' => true,     // mas aparece no admin
-            'show_in_menu' => 'press-lms',
-            'supports' => ['title', 'editor', 'thumbnail'],
+            'show_in_menu' => false, // acesso à criação/edição deve partir da tela do curso
+            'supports' => ['title', 'editor', 'thumbnail', 'page-attributes'],
             'rewrite' => false,    // rota vai ser custom via Rewrite do plugin
         ]);
     }

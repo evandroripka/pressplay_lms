@@ -52,12 +52,69 @@ class PRESS_LMS_Course_Meta
     {
         add_meta_box(
             'press_course_details',
-            'Detalhes do Curso',
+            'Configurações do Curso',
             [__CLASS__, 'render'],
             'press_course',
             'normal',
             'high'
         );
+    }
+
+    private static function get_course_lessons(int $course_id): array
+    {
+        return PRESS_LMS_Helpers::get_course_lessons($course_id, ['publish', 'draft', 'pending', 'private']);
+    }
+
+    private static function render_lessons_section($post)
+    {
+        $course_id = (int) $post->ID;
+        $lessons = self::get_course_lessons($course_id);
+        $new_lesson_url = admin_url('post-new.php?post_type=press_lesson&course_id=' . $course_id);
+
+        echo '<div class="press-course-tab__section">';
+        echo '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">';
+        echo '<div>';
+        echo '<h3 style="margin:0 0 4px;">Aulas do Curso</h3>';
+        echo '<p style="margin:0;color:#646970;">Crie novas aulas por aqui e edite as já vinculadas a este curso.</p>';
+        echo '</div>';
+        echo '<a href="' . esc_url($new_lesson_url) . '" class="button button-primary">Adicionar nova aula</a>';
+        echo '</div>';
+
+        if (!$lessons) {
+            echo '<p>Nenhuma aula cadastrada ainda para este curso.</p>';
+            echo '</div>';
+            return;
+        }
+
+        echo '<table class="widefat striped">';
+        echo '<thead>';
+        echo '<tr>';
+        echo '<th style="width:80px;">Ordem</th>';
+        echo '<th>Título</th>';
+        echo '<th style="width:120px;">Status</th>';
+        echo '<th style="width:180px;">Ações</th>';
+        echo '</tr>';
+        echo '</thead>';
+        echo '<tbody>';
+
+        foreach ($lessons as $lesson) {
+            $edit_url = get_edit_post_link($lesson->ID);
+            $view_url = home_url('/curso/' . $post->post_name . '/aula/' . $lesson->post_name . '/');
+
+            echo '<tr>';
+            echo '<td>' . (int) $lesson->menu_order . '</td>';
+            echo '<td><strong>' . esc_html($lesson->post_title ?: '(Sem título)') . '</strong></td>';
+            echo '<td>' . esc_html($lesson->post_status) . '</td>';
+            echo '<td>';
+            echo '<a class="button button-small" href="' . esc_url($edit_url) . '">Editar</a> ';
+            echo '<a class="button button-small" href="' . esc_url($view_url) . '" target="_blank">Ver</a>';
+            echo '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody>';
+        echo '</table>';
+        echo '</div>';
     }
 
     public static function render($post)
@@ -68,6 +125,114 @@ class PRESS_LMS_Course_Meta
         $product_id = (int) get_post_meta($post->ID, '_press_course_product_id', true);
         $price      = get_post_meta($post->ID, '_press_course_price', true);
 
+        // Carrega todos os professores cadastrados
+        $teachers = get_posts([
+            'post_type' => 'press_teacher',
+            'posts_per_page' => -1,
+            'post_status' => 'publish'
+        ]);
+
+        $selected_teacher = (int) get_post_meta($post->ID, '_press_course_teacher', true);
+
+        $certificate_description = (string) get_post_meta($post->ID, '_press_course_certificate_description', true);
+        $certificate_logo_id     = (int) get_post_meta($post->ID, '_press_course_certificate_logo_id', true);
+        $certificate_sign_id     = (int) get_post_meta($post->ID, '_press_course_certificate_signature_id', true);
+
+        $certificate_logo_url = $certificate_logo_id ? wp_get_attachment_url($certificate_logo_id) : '';
+        $certificate_sign_url = $certificate_sign_id ? wp_get_attachment_url($certificate_sign_id) : '';
+        $lessons_count = count(self::get_course_lessons((int) $post->ID));
+
+        $certificate_html = (string) get_post_meta($post->ID, '_press_course_certificate_html', true);
+
+        if ($certificate_html === '') {
+            $certificate_html = self::get_default_certificate_html();
+        }
+
+        echo '<style>
+            .press-course-tabs {
+                margin-top: 8px;
+            }
+            .press-course-tabs__nav {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+                border-bottom: 1px solid #dcdcde;
+            }
+            .press-course-tabs__btn {
+                appearance: none;
+                border: 1px solid #dcdcde;
+                background: #f6f7f7;
+                border-radius: 999px;
+                padding: 8px 14px;
+                font-weight: 600;
+                color: #1d2327;
+                cursor: pointer;
+            }
+            .press-course-tabs__btn.is-active {
+                background: #2271b1;
+                border-color: #2271b1;
+                color: #fff;
+            }
+            .press-course-tabs__count {
+                display: inline-block;
+                margin-left: 6px;
+                padding: 1px 7px;
+                border-radius: 999px;
+                background: rgba(255,255,255,0.24);
+                font-size: 12px;
+            }
+            .press-course-tabs__btn:not(.is-active) .press-course-tabs__count {
+                background: #e7f0f7;
+                color: #0a4b78;
+            }
+            .press-course-tab {
+                display: block;
+            }
+            .press-course-tabs.is-enhanced .press-course-tab {
+                display: none;
+            }
+            .press-course-tabs.is-enhanced .press-course-tab.is-active {
+                display: block;
+            }
+            .press-course-tab__section {
+                padding: 16px;
+                background: #fff;
+                border: 1px solid #dcdcde;
+                border-radius: 12px;
+                margin-bottom: 16px;
+            }
+            .press-course-tab__section:last-child {
+                margin-bottom: 0;
+            }
+            .press-course-tab__section h3 {
+                margin-top: 0;
+            }
+            .press-course-tab__grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 16px;
+            }
+            @media (max-width: 960px) {
+                .press-course-tab__grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>';
+
+        echo '<div class="press-course-tabs" id="press-course-tabs">';
+        echo '<div class="press-course-tabs__nav" role="tablist" aria-label="Seções do curso">';
+        echo '<button type="button" class="press-course-tabs__btn is-active" data-tab-target="details" role="tab" aria-selected="true">Detalhes</button>';
+        echo '<button type="button" class="press-course-tabs__btn" data-tab-target="certificate" role="tab" aria-selected="false">Certificado</button>';
+        echo '<button type="button" class="press-course-tabs__btn" data-tab-target="lessons" role="tab" aria-selected="false">Aulas <span class="press-course-tabs__count">' . esc_html($lessons_count) . '</span></button>';
+        echo '</div>';
+
+        echo '<div class="press-course-tab is-active" data-tab-panel="details">';
+        echo '<div class="press-course-tab__section">';
+        echo '<h3>Detalhes do Curso</h3>';
+        echo '<p style="margin-top:0;color:#646970;">Configure venda, trailer e professor principal do curso.</p>';
+
         echo '<p><label><strong>Valor do curso (R$)</strong></label><br>';
         echo '<input type="text" name="press_course_price" value="' . esc_attr($price) . '" class="small-text" placeholder="99,90"> ';
         echo '<span style="color:#666">Ao publicar o curso, o produto WooCommerce será criado/atualizado automaticamente.</span></p>';
@@ -76,7 +241,6 @@ class PRESS_LMS_Course_Meta
         echo '<input type="url" name="press_course_trailer" value="' . esc_attr($trailer) . '" class="widefat" placeholder="https://vimeo.com/... ou https://youtu.be/..."></p>';
 
         echo '<hr>';
-
         echo '<p><label><strong>Produto WooCommerce</strong></label><br>';
 
         if ($product_id > 0 && get_post($product_id)) {
@@ -93,43 +257,30 @@ class PRESS_LMS_Course_Meta
         }
 
         echo '</p>';
-
         echo '<hr>';
         echo '<p style="color:#666">MVP: Galeria de imagens podemos fazer depois (Media Uploader). Primeiro vamos fechar curso/aulas/materiais.</p>';
 
-        // Carrega todos os professores cadastrados
-        $teachers = get_posts([
-            'post_type' => 'press_teacher',
-            'posts_per_page' => -1,
-            'post_status' => 'publish'
-        ]);
-
-        $selected_teacher = (int) get_post_meta($post->ID, '_press_course_teacher', true);
-        echo '<label for="press_course_teacher">Professor do curso</label>';
+        echo '<p><label for="press_course_teacher"><strong>Professor do curso</strong></label><br>';
         echo '<select name="press_course_teacher" id="press_course_teacher" class="widefat">';
         echo '<option value="">— Selecionar —</option>';
         foreach ($teachers as $teacher) {
             $selected = selected($selected_teacher, $teacher->ID, false);
             echo '<option value="' . esc_attr($teacher->ID) . '"' . $selected . '>' . esc_html($teacher->post_title) . '</option>';
         }
-        echo '</select>';
+        echo '</select></p>';
+        echo '</div>';
+        echo '</div>';
 
-        $certificate_description = (string) get_post_meta($post->ID, '_press_course_certificate_description', true);
-        $certificate_logo_id     = (int) get_post_meta($post->ID, '_press_course_certificate_logo_id', true);
-        $certificate_sign_id     = (int) get_post_meta($post->ID, '_press_course_certificate_signature_id', true);
-
-        $certificate_logo_url = $certificate_logo_id ? wp_get_attachment_url($certificate_logo_id) : '';
-        $certificate_sign_url = $certificate_sign_id ? wp_get_attachment_url($certificate_sign_id) : '';
-
-        echo '<hr>';
-        echo '<h3 style="margin:18px 0 12px;">Certificado</h3>';
+        echo '<div class="press-course-tab" data-tab-panel="certificate">';
+        echo '<div class="press-course-tab__section">';
+        echo '<h3>Configurações do Certificado</h3>';
+        echo '<p style="margin-top:0;color:#646970;">Personalize textos, imagens e o layout entregue ao aluno.</p>';
 
         echo '<p><label><strong>Descrição do certificado</strong></label><br>';
         echo '<textarea name="press_course_certificate_description" class="widefat" rows="4" placeholder="Ex.: Certificamos que o aluno concluiu com êxito este curso e demonstrou domínio dos conteúdos propostos.">' . esc_textarea($certificate_description) . '</textarea></p>';
 
-        echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+        echo '<div class="press-course-tab__grid">';
 
-        // Logo
         echo '<div>';
         echo '<label><strong>Logo do certificado</strong></label>';
         echo '<input type="hidden" name="press_course_certificate_logo_id" id="press_course_certificate_logo_id" value="' . esc_attr($certificate_logo_id) . '">';
@@ -140,7 +291,6 @@ class PRESS_LMS_Course_Meta
         echo '</p>';
         echo '</div>';
 
-        // Assinatura
         echo '<div>';
         echo '<label><strong>Assinatura do certificado</strong></label>';
         echo '<input type="hidden" name="press_course_certificate_signature_id" id="press_course_certificate_signature_id" value="' . esc_attr($certificate_sign_id) . '">';
@@ -152,17 +302,11 @@ class PRESS_LMS_Course_Meta
         echo '</div>';
 
         echo '</div>';
+        echo '</div>';
 
-        $certificate_html = (string) get_post_meta($post->ID, '_press_course_certificate_html', true);
-
-        if ($certificate_html === '') {
-            $certificate_html = self::get_default_certificate_html();
-        }
-
-        echo '<hr>';
-        echo '<h3 style="margin:18px 0 12px;">Layout do Certificado</h3>';
+        echo '<div class="press-course-tab__section">';
+        echo '<h3>Layout do Certificado</h3>';
         echo '<p style="color:#666;margin-bottom:8px;">Você pode personalizar o HTML do certificado usando os placeholders abaixo:</p>';
-
         echo '<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;margin-bottom:12px;">';
         echo '<code>{{student_name}}</code> ';
         echo '<code>{{course_name}}</code> ';
@@ -184,9 +328,54 @@ class PRESS_LMS_Course_Meta
                 'quicktags'     => true,
             ]
         );
+        echo '</div>';
+        echo '</div>';
+
+        echo '<div class="press-course-tab" data-tab-panel="lessons">';
+        self::render_lessons_section($post);
+        echo '</div>';
+        echo '</div>';
 ?>
         <script>
             (function($) {
+                const $tabsRoot = $('#press-course-tabs');
+
+                if ($tabsRoot.length) {
+                    const $buttons = $tabsRoot.find('.press-course-tabs__btn');
+                    const $panels = $tabsRoot.find('.press-course-tab');
+
+                    $tabsRoot.addClass('is-enhanced');
+
+                    function activateTab(tabId) {
+                        $buttons.each(function() {
+                            const $button = $(this);
+                            const isActive = $button.data('tab-target') === tabId;
+                            $button.toggleClass('is-active', isActive);
+                            $button.attr('aria-selected', isActive ? 'true' : 'false');
+                        });
+
+                        $panels.each(function() {
+                            const $panel = $(this);
+                            $panel.toggleClass('is-active', $panel.data('tab-panel') === tabId);
+                        });
+
+                        if (tabId === 'certificate' && typeof window.tinymce !== 'undefined') {
+                            window.setTimeout(function() {
+                                const editor = window.tinymce.get('press_course_certificate_html');
+                                if (editor) {
+                                    editor.execCommand('mceRepaint');
+                                }
+                            }, 50);
+                        }
+                    }
+
+                    $buttons.on('click', function() {
+                        activateTab($(this).data('tab-target'));
+                    });
+
+                    activateTab('details');
+                }
+
                 function openMedia(targetId, targetUrlId, title) {
                     const frame = wp.media({
                         title: title,

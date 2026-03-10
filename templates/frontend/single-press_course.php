@@ -7,7 +7,7 @@ $course_slug = (string) ($course_slug_var ?? '');
 $can_access  = (bool) ($can_access_var ?? false);
 
 $trailer     = (string) ($trailer_var ?? '');
-$lessons     = is_array($lessons_var ?? null) ? $lessons_var : [];
+$lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 
 $first_lesson_url = (string) ($first_lesson_url_var ?? '');
 $product_id       = (int) ($product_id_var ?? 0);

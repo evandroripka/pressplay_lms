@@ -3,6 +3,58 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Helpers {
 
+    public static function get_course_lessons($course_id, $post_status = ['publish']) {
+        $course_id = (int) $course_id;
+        if ($course_id <= 0) return [];
+
+        $statuses = is_array($post_status) ? array_values(array_filter($post_status)) : [$post_status];
+        if (empty($statuses)) {
+            $statuses = ['publish'];
+        }
+
+        $lessons_by_parent = get_posts([
+            'post_type'      => 'press_lesson',
+            'post_status'    => $statuses,
+            'posts_per_page' => -1,
+            'post_parent'    => $course_id,
+            'orderby'        => 'menu_order title',
+            'order'          => 'ASC',
+        ]);
+
+        $lessons_by_meta = get_posts([
+            'post_type'      => 'press_lesson',
+            'post_status'    => $statuses,
+            'posts_per_page' => -1,
+            'meta_key'       => '_press_lesson_course_id',
+            'meta_value'     => $course_id,
+            'orderby'        => 'menu_order title',
+            'order'          => 'ASC',
+        ]);
+
+        $indexed = [];
+
+        foreach (array_merge($lessons_by_parent, $lessons_by_meta) as $lesson) {
+            if (!$lesson instanceof WP_Post) {
+                continue;
+            }
+
+            $indexed[$lesson->ID] = $lesson;
+        }
+
+        $lessons = array_values($indexed);
+
+        usort($lessons, function ($a, $b) {
+            $order_compare = (int) $a->menu_order <=> (int) $b->menu_order;
+            if ($order_compare !== 0) {
+                return $order_compare;
+            }
+
+            return strcasecmp($a->post_title, $b->post_title);
+        });
+
+        return $lessons;
+    }
+
     public static function username_from_email($email) {
         $base = sanitize_user(current(explode('@', $email)), true);
         if (!$base) $base = 'aluno';

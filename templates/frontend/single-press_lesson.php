@@ -289,15 +289,7 @@ if (!function_exists('presslms_format_seconds')) {
           // ---------------------------------------------------------
           // Sidebar: lista real de aulas do curso
           // ---------------------------------------------------------
-          $lessons_list = get_posts([
-            'post_type'      => 'press_lesson',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'meta_key'       => '_press_lesson_course_id',
-            'meta_value'     => (int) $course->ID,
-            'orderby'        => 'menu_order title', // se você usar menu_order, ele respeita
-            'order'          => 'ASC',
-          ]);
+          $lessons_list = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 
           $current_lesson_id = (int) $lesson->ID;
           ?>

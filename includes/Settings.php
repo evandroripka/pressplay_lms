@@ -42,6 +42,14 @@ class PRESS_LMS_Settings
         );
         add_submenu_page(
             'press-lms',
+            'Alunos',
+            'Alunos',
+            'manage_options',
+            'press-lms-students',
+            [__CLASS__, 'page_students']
+        );
+        add_submenu_page(
+            'press-lms',
             'Configurações',
             'Configurações',
             'manage_options',
@@ -49,16 +57,9 @@ class PRESS_LMS_Settings
             [__CLASS__, 'page_settings']
         );
 
-        add_submenu_page(
-            'press-lms',
-            'Alunos',
-            'Alunos',
-            'manage_options',
-            'press-lms-students',
-            [__CLASS__, 'page_students']
-        );
 
-        add_submenu_page(
+
+        /* add_submenu_page(
             'press-lms',
             'Matrículas',
             'Matrículas',
@@ -74,7 +75,7 @@ class PRESS_LMS_Settings
             'manage_options',
             'press-lms-progress',
             [__CLASS__, 'page_progress']
-        );
+        ); */
     }
 
     public static function register()

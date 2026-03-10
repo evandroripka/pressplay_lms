@@ -113,7 +113,11 @@ class PRESS_LMS_Lesson_Meta
     {
         wp_nonce_field('press_lesson_meta_save', 'press_lesson_meta_nonce');
 
-        $course_id = get_post_meta($post->ID, self::META_COURSE_ID, true);
+        $course_id = (int) get_post_meta($post->ID, self::META_COURSE_ID, true);
+
+        if ($course_id <= 0 && !empty($_GET['course_id'])) {
+            $course_id = (int) $_GET['course_id'];
+        }
         $video_url = get_post_meta($post->ID, self::META_VIDEO_URL, true);
 
         $materials = self::load_materials($post->ID);
@@ -130,6 +134,14 @@ class PRESS_LMS_Lesson_Meta
             'post_status' => 'publish',
             'orderby' => 'title',
             'order' => 'ASC',
+        ]);
+
+        $teachers = get_posts([
+            'post_type'      => 'press_teacher',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'orderby'        => 'title',
+            'order'          => 'ASC',
         ]);
 
         echo '<p><label><strong>Curso</strong></label><br>';
@@ -163,13 +175,14 @@ class PRESS_LMS_Lesson_Meta
         } else {
             echo '<p style="margin:6px 0;color:#666">Cole uma URL do Vimeo e salve a aula para validar via API (se token estiver configurado).</p>';
         }
-        $course_id = (int) get_post_meta($post->ID, '_press_lesson_course_id', true);
-        $default_teacher = (int) get_post_meta($course_id, '_press_course_teacher', true);
+
+        $default_teacher = $course_id > 0 ? (int) get_post_meta($course_id, '_press_course_teacher', true) : 0;
         $lesson_teacher = (int) get_post_meta($post->ID, '_press_lesson_teacher', true);
 
         echo '<label for="press_lesson_teacher">Professor da aula</label>';
         echo '<select name="press_lesson_teacher" id="press_lesson_teacher" class="widefat">';
-        echo '<option value="">Usar professor do curso (' . get_the_title($default_teacher) . ')</option>';
+        $default_teacher_label = $default_teacher > 0 ? get_the_title($default_teacher) : 'nenhum professor definido no curso';
+        echo '<option value="">Usar professor do curso (' . esc_html($default_teacher_label) . ')</option>';
         foreach ($teachers as $teacher) {
             $selected = selected($lesson_teacher, $teacher->ID, false);
             echo '<option value="' . esc_attr($teacher->ID) . '"' . $selected . '>' . esc_html($teacher->post_title) . '</option>';
@@ -541,6 +554,15 @@ class PRESS_LMS_Lesson_Meta
         $video_url = esc_url_raw($_POST['press_lesson_video_url'] ?? '');
 
         update_post_meta($post_id, self::META_COURSE_ID, $course_id);
+        global $wpdb;
+
+        $wpdb->update(
+            $wpdb->posts,
+            ['post_parent' => $course_id],
+            ['ID' => $post_id]
+        );
+
+        clean_post_cache($post_id);
         update_post_meta($post_id, self::META_VIDEO_URL, $video_url);
 
         // ==========================

@@ -154,6 +154,46 @@ class PRESS_LMS_Frontend
         echo '</div>';
     }
 
+    private static function find_lesson_for_course(string $lesson_slug, int $course_id)
+    {
+        $lesson_slug = sanitize_title($lesson_slug);
+        if ($lesson_slug === '' || $course_id <= 0) {
+            return null;
+        }
+
+        $candidates = get_posts([
+            'post_type'      => 'press_lesson',
+            'post_status'    => ['publish', 'draft', 'pending', 'private', 'future'],
+            'posts_per_page' => -1,
+            'name'           => $lesson_slug,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ]);
+
+        foreach ($candidates as $lesson) {
+            if (!$lesson instanceof WP_Post) {
+                continue;
+            }
+
+            $lesson_course_id = (int) $lesson->post_parent;
+            if ($lesson_course_id <= 0) {
+                $lesson_course_id = (int) get_post_meta($lesson->ID, '_press_lesson_course_id', true);
+            }
+
+            if ($lesson_course_id === $course_id) {
+                return $lesson;
+            }
+        }
+
+        foreach (PRESS_LMS_Helpers::get_course_lessons($course_id, ['publish', 'draft', 'pending', 'private', 'future']) as $lesson) {
+            if ($lesson instanceof WP_Post && $lesson->post_name === $lesson_slug) {
+                return $lesson;
+            }
+        }
+
+        return null;
+    }
+
     public static function render_course_by_slug($slug)
     {
         $course = get_page_by_path($slug, OBJECT, 'press_course');
@@ -201,15 +241,7 @@ class PRESS_LMS_Frontend
         }
 
         // Lista aulas vinculadas (apenas para matriculados/admin)
-        $lessons = get_posts([
-            'post_type' => 'press_lesson',
-            'numberposts' => -1,
-            'post_status' => 'publish',
-            'meta_key' => '_press_lesson_course_id',
-            'meta_value' => $course->ID,
-            'orderby' => 'title',
-            'order' => 'ASC',
-        ]);
+        $lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 
         // Só imprime a seção Aulas se fizer sentido
         if ($lessons && count($lessons) > 0) {
@@ -233,7 +265,7 @@ class PRESS_LMS_Frontend
     public static function render_lesson_by_slug($course_slug, $lesson_slug)
     {
         $course = get_page_by_path($course_slug, OBJECT, 'press_course');
-        $lesson = get_page_by_path($lesson_slug, OBJECT, 'press_lesson');
+        $lesson = $course ? self::find_lesson_for_course((string) $lesson_slug, (int) $course->ID) : null;
 
         // Valida existence primeiro
         if (!$course || !$lesson) {
@@ -245,8 +277,12 @@ class PRESS_LMS_Frontend
             return;
         }
 
-        // garante que a aula pertence ao curso
-        $lesson_course_id = (int) get_post_meta($lesson->ID, '_press_lesson_course_id', true);
+        $lesson_course_id = (int) $lesson->post_parent;
+
+        if ($lesson_course_id <= 0) {
+            $lesson_course_id = (int) get_post_meta($lesson->ID, '_press_lesson_course_id', true);
+        }
+
         if ($lesson_course_id !== (int) $course->ID) {
             self::header('Aula - Pressplay');
             echo '<div class="press-container"><div class="press-card">';
