@@ -1,0 +1,105 @@
+.presslms-admin-page {
+  margin-top: 20px;
+}
+
+.presslms-panel {
+  max-width: 1400px;
+}
+
+.presslms-panel__header {
+  margin-bottom: 20px;
+}
+
+.presslms-box {
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  border: 1px solid #e5e7eb;
+}
+
+.presslms-box--filters {
+  margin-bottom: 20px;
+}
+
+.presslms-field .label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.presslms-btn {
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.presslms-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.presslms-table {
+  font-size: 14px;
+}
+
+.presslms-table thead th {
+  color: #374151;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.presslms-student-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.presslms-student-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex: 0 0 42px;
+}
+
+.presslms-muted {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.presslms-progress-meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.presslms-table-actions {
+  flex-wrap: wrap;
+}
+
+.presslms-btn-action {
+  border-radius: 10px;
+}
+
+.presslms-empty-state {
+  padding: 28px 12px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.presslms-admin-page--students .progress {
+  height: 8px;
+}
+
+@media (max-width: 1100px) {
+  .presslms-table {
+    min-width: 1100px;
+  }
+}

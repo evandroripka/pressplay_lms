@@ -6,23 +6,18 @@ if (!defined('ABSPATH')) exit;
 
 $course_slug = isset($course_slug_var) ? (string)$course_slug_var : '';
 $lesson_slug = isset($lesson_slug_var) ? (string)$lesson_slug_var : '';
-
 $course = (isset($course_var) && $course_var instanceof WP_Post) ? $course_var : null;
 $lesson = (isset($lesson_var) && $lesson_var instanceof WP_Post) ? $lesson_var : null;
-
 if (!$course || !$lesson) {
   echo '<div class="presslms presslms-lesson"><div class="presslms__container"><div class="presslms-card"><h1 class="presslms-h1">Aula não encontrada</h1></div></div></div>';
   return;
 }
-
 $video_url = (string) get_post_meta($lesson->ID, '_press_lesson_video_url', true);
 $vimeo_id  = (int) get_post_meta($lesson->ID, '_press_lesson_vimeo_id', true);
-
 $materials_items = (array) get_post_meta($lesson->ID, '_press_lesson_materials_v2', true);
 if (class_exists('PRESS_LMS_Materials')) {
   $materials_items = PRESS_LMS_Materials::normalize_items($materials_items);
 }
-
 // duração por meta (vamos preencher via API depois)
 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
 $course_duration = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
@@ -84,10 +79,8 @@ if (!function_exists('presslms_format_seconds')) {
   }
 }
 ?>
-
 <div class="presslms presslms-lesson" data-presslms-page="lesson">
   <div class="presslms__container">
-
     <header class="presslms-topbar">
       <div class="presslms-topbar__left">
         <!--         <a class="presslms-back" href="<?php echo esc_url(home_url('/curso/' . $course_slug)); ?>">
@@ -97,13 +90,11 @@ if (!function_exists('presslms_format_seconds')) {
  -->
         <div class="presslms-title">
           <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?></h1>
-
           <div class="presslms-meta">
             <span class="presslms-chip">
               <i class="fa-light fa-clock"></i>
               <b><?php echo esc_html(presslms_format_seconds($course_duration)); ?></b> total
             </span>
-
             <span class="presslms-chip">
               <i class="fa-light fa-circle-play"></i>
               Aula: <b><?php echo esc_html(presslms_format_seconds($lesson_duration)); ?></b>
@@ -111,7 +102,6 @@ if (!function_exists('presslms_format_seconds')) {
           </div>
         </div>
       </div>
-
       <div class="presslms-topbar__right">
         <a class="presslms-btn presslms-btn--primary" href="#">
           <i class="fa-light fa-bag-shopping"></i>
@@ -119,11 +109,8 @@ if (!function_exists('presslms_format_seconds')) {
         </a>
       </div>
     </header>
-
     <div class="presslms-layout">
-
       <main class="presslms-main">
-
         <section class="presslms-card presslms-player">
           <div class="presslms-player__ratio">
             <?php
@@ -149,7 +136,6 @@ if (!function_exists('presslms_format_seconds')) {
             ?>
           </div>
         </section>
-
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -157,13 +143,10 @@ if (!function_exists('presslms_format_seconds')) {
               <?php echo esc_html($lesson->post_title); ?>
             </h2>
           </div>
-
           <div class="presslms-content">
             <?php echo apply_filters('the_content', $lesson->post_content); ?>
           </div>
         </section>
-
-       
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -171,10 +154,8 @@ if (!function_exists('presslms_format_seconds')) {
               Instrutor
             </h2>
           </div>
-
           <?php if ($teacher_id > 0 && $teacher_name !== ''): ?>
             <div class="presslms-instructor">
-
               <?php if ($teacher_photo): ?>
                 <div class="presslms-avatar presslms-avatar--image">
                   <img src="<?php echo esc_url($teacher_photo); ?>" alt="<?php echo esc_attr($teacher_name); ?>">
@@ -182,20 +163,16 @@ if (!function_exists('presslms_format_seconds')) {
               <?php else: ?>
                 <div class="presslms-avatar" aria-hidden="true"></div>
               <?php endif; ?>
-
               <div class="presslms-instructor__content">
                 <div class="presslms-strong"><?php echo esc_html($teacher_name); ?></div>
-
                 <?php if ($teacher_profession): ?>
                   <div class="presslms-muted"><?php echo esc_html($teacher_profession); ?></div>
                 <?php endif; ?>
-
                 <?php if ($teacher_bio): ?>
                   <div class="presslms-instructor__bio">
                     <?php echo wp_kses_post(wpautop($teacher_bio)); ?>
                   </div>
                 <?php endif; ?>
-
                 <?php
                 $has_social =
                   $teacher_instagram ||
@@ -207,7 +184,6 @@ if (!function_exists('presslms_format_seconds')) {
                   $teacher_pinterest ||
                   $teacher_email;
                 ?>
-
                 <?php if ($has_social): ?>
                   <div class="presslms-social">
                     <?php if ($teacher_instagram): ?>
@@ -261,12 +237,10 @@ if (!function_exists('presslms_format_seconds')) {
                 <?php endif; ?>
               </div>
             </div>
-
           <?php else: ?>
             <p class="presslms-muted">Nenhum instrutor definido para esta aula.</p>
           <?php endif; ?>
         </section>
-
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -274,7 +248,6 @@ if (!function_exists('presslms_format_seconds')) {
               Materiais
             </h2>
           </div>
-
           <?php if (!$materials_items || count($materials_items) === 0): ?>
             <p class="presslms-muted">Sem materiais nesta aula.</p>
           <?php else: ?>
@@ -302,11 +275,8 @@ if (!function_exists('presslms_format_seconds')) {
             </ul>
           <?php endif; ?>
         </section>
-
       </main>
-
       <aside class="presslms-aside">
-
         <section class="presslms-card presslms-aside__sticky">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -348,7 +318,6 @@ if (!function_exists('presslms_format_seconds')) {
             <?php endif; ?>
           </nav>
         </section>
-
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -356,7 +325,6 @@ if (!function_exists('presslms_format_seconds')) {
               Cursos Relacionados
             </h2>
           </div>
-
           <div class="presslms-related">
             <article class="presslms-related__item">
               <div class="presslms-thumb" aria-hidden="true"></div>
@@ -368,7 +336,6 @@ if (!function_exists('presslms_format_seconds')) {
             </article>
           </div>
         </section>
-
       </aside>
     </div>
   </div>

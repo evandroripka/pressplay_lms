@@ -29,6 +29,7 @@ class PRESS_LMS_Enrollments
     public static function get_or_create_pending(int $user_id, int $course_id, string $provider = 'woocommerce'): int
     {
         global $wpdb;
+        self::ensure_student_role($user_id);
         $table = PRESS_LMS_Database::table('enrollments');
         $now = current_time('mysql');
 
@@ -69,10 +70,30 @@ class PRESS_LMS_Enrollments
 
         return (int)$wpdb->insert_id;
     }
+    public static function ensure_student_role(int $user_id): void
+    {
+        if ($user_id <= 0) return;
 
+        $user = get_userdata($user_id);
+        if (!$user) return;
+
+        // não mexe em admin
+        if (user_can($user_id, 'manage_options')) return;
+
+        // se já for aluno, ok
+        if (in_array('press_student', (array) $user->roles, true)) {
+            return;
+        }
+
+        // define role principal como aluno
+        $user->set_role('press_student');
+    }
     public static function activate_enrollment(int $user_id, int $course_id, int $order_id, string $provider = 'woocommerce'): void
     {
         global $wpdb;
+
+        self::ensure_student_role($user_id);
+
         $table = PRESS_LMS_Database::table('enrollments');
 
         $now_ts = current_time('timestamp');

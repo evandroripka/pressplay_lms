@@ -11,6 +11,7 @@ class PRESS_LMS_Settings
     {
         add_action('admin_menu', [__CLASS__, 'menu']);
         add_action('admin_init', [__CLASS__, 'register']);
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_panel_assets']);
     }
 
     public static function menu()
@@ -208,7 +209,152 @@ class PRESS_LMS_Settings
 
     public static function page_students()
     {
-        echo '<div class="wrap"><h1>Alunos</h1><p>Listagem e gerenciamento.</p></div>';
+        if (!current_user_can('manage_options')) return;
+
+        global $wpdb;
+
+        $table_students    = PRESS_LMS_Database::table('students');
+        $table_enrollments = PRESS_LMS_Database::table('enrollments');
+        $table_progress    = PRESS_LMS_Database::table('progress');
+        $posts_table       = $wpdb->posts;
+        $postmeta_table    = $wpdb->postmeta;
+        $users_table       = $wpdb->users;
+
+        // Filtros
+        $filter_course = isset($_GET['course']) ? (int) $_GET['course'] : 0;
+        $filter_status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
+        $filter_search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
+        $filter_sort   = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'date_desc';
+
+        $where = [];
+        $params = [];
+
+        $where[] = "1=1";
+
+        if ($filter_course > 0) {
+            $where[] = "e.course_id = %d";
+            $params[] = $filter_course;
+        }
+
+        if ($filter_status !== '') {
+            $where[] = "e.status = %s";
+            $params[] = $filter_status;
+        }
+
+        if ($filter_search !== '') {
+            $like = '%' . $wpdb->esc_like($filter_search) . '%';
+            $where[] = "(st.full_name LIKE %s OR u.user_email LIKE %s OR c.post_title LIKE %s)";
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $order_by = "e.created_at DESC";
+
+        switch ($filter_sort) {
+            case 'name_asc':
+                $order_by = "st.full_name ASC";
+                break;
+            case 'name_desc':
+                $order_by = "st.full_name DESC";
+                break;
+            case 'date_asc':
+                $order_by = "e.created_at ASC";
+                break;
+            case 'date_desc':
+            default:
+                $order_by = "e.created_at DESC";
+                break;
+        }
+
+        $where_sql = implode(' AND ', $where);
+
+        $sql = "
+        SELECT
+            e.id,
+            e.user_id,
+            e.course_id,
+            e.status,
+            e.order_ref,
+            e.payment_provider,
+            e.created_at,
+            e.updated_at,
+            e.purchased_at,
+            e.expires_at,
+
+            COALESCE(NULLIF(st.full_name, ''), NULLIF(u.display_name, ''), NULLIF(u.user_nicename, ''), 'Sem nome') AS full_name,
+st.phone_raw,
+st.phone_e164,
+u.user_email,
+u.display_name,
+
+            c.post_title AS course_title,
+
+            COALESCE(pr.completed_lessons, 0) AS completed_lessons,
+            COALESCE(tl.total_lessons, 0) AS total_lessons
+
+        FROM {$table_enrollments} e
+
+        LEFT JOIN {$table_students} st
+            ON st.user_id = e.user_id
+
+        LEFT JOIN {$users_table} u
+            ON u.ID = e.user_id
+
+        LEFT JOIN {$posts_table} c
+            ON c.ID = e.course_id
+
+        LEFT JOIN (
+            SELECT
+                user_id,
+                course_id,
+                SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed_lessons
+            FROM {$table_progress}
+            GROUP BY user_id, course_id
+        ) pr
+            ON pr.user_id = e.user_id
+            AND pr.course_id = e.course_id
+
+        LEFT JOIN (
+            SELECT
+                pm.meta_value AS course_id,
+                COUNT(p.ID) AS total_lessons
+            FROM {$posts_table} p
+            INNER JOIN {$postmeta_table} pm
+                ON pm.post_id = p.ID
+                AND pm.meta_key = '_press_lesson_course_id'
+            WHERE p.post_type = 'press_lesson'
+              AND p.post_status = 'publish'
+            GROUP BY pm.meta_value
+        ) tl
+            ON tl.course_id = e.course_id
+
+        WHERE {$where_sql}
+        ORDER BY {$order_by}
+    ";
+
+        if (!empty($params)) {
+            $sql = $wpdb->prepare($sql, $params);
+        }
+
+        $students = $wpdb->get_results($sql);
+
+        $courses = get_posts([
+            'post_type'      => 'press_course',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+        ]);
+
+        self::render_panel_template('alunos.php', [
+            'students'      => $students,
+            'courses'       => $courses,
+            'filter_course' => $filter_course,
+            'filter_status' => $filter_status,
+            'filter_search' => $filter_search,
+            'filter_sort'   => $filter_sort,
+        ]);
     }
 
     public static function page_enrollments()
@@ -219,5 +365,51 @@ class PRESS_LMS_Settings
     public static function page_progress()
     {
         echo '<div class="wrap"><h1>Progresso</h1><p>Relatórios de progresso por aluno/curso.</p></div>';
+    }
+
+    public static function enqueue_panel_assets($hook)
+    {
+        if (!is_admin()) return;
+
+        $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
+
+        $allowed_pages = [
+            'press-lms',
+            self::PAGE_SLUG,
+            'press-lms-students',
+            'press-lms-enrollments',
+            'press-lms-progress',
+        ];
+
+        if (!in_array($page, $allowed_pages, true)) {
+            return;
+        }
+
+        // Bulma só nas telas internas do plugin
+        wp_enqueue_style(
+            'presslms-bulma',
+            'https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css',
+            [],
+            '0.9.4'
+        );
+
+        wp_enqueue_style(
+            'presslms-admin-panels',
+            PRESS_LMS_URL . 'assets/css/admin-panels.css',
+            ['presslms-bulma', 'press-lms-admin'],
+            PRESS_LMS_VERSION
+        );
+    }
+    private static function render_panel_template($template_file, array $vars = [])
+    {
+        $template = PRESS_LMS_PATH . 'templates/panel/' . $template_file;
+
+        if (!file_exists($template)) {
+            echo '<div class="wrap"><div class="notice notice-error"><p>Template não encontrado: ' . esc_html($template) . '</p></div></div>';
+            return;
+        }
+
+        extract($vars, EXTR_SKIP);
+        include $template;
     }
 }
