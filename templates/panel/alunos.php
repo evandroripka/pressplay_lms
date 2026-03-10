@@ -214,15 +214,16 @@ function presslms_admin_student_progress_percent($completed, $total)
                                             </button>
                                             <button type="button" class="button is-danger is-light presslms-btn-action">Bloquear Acesso</button>
                                             <a
-                                                class="button is-success is-light presslms-btn-action"
-                                                target="_blank"
-                                                href="<?php echo esc_url(
-                                                            admin_url(
-                                                                'admin-post.php?action=press_lms_preview_certificate&course_id=' . (int)$student->course_id . '&user_id=' . (int)$student->user_id
-                                                            )
-                                                        ); ?>">
-                                                Emitir Certificado
-                                            </a>
+  class="button is-success is-light presslms-btn-action"
+  target="_blank"
+  href="<?php echo esc_url(
+    admin_url(
+      'admin-post.php?action=press_lms_preview_certificate&course_id=' . (int)$student->course_id . '&user_id=' . (int)$student->user_id
+    )
+  ); ?>"
+>
+  Emitir Certificado
+</a>
                                         </div>
                                     </td>
                                 </tr>

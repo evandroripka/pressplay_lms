@@ -9,6 +9,45 @@ class PRESS_LMS_Course_Meta
         add_action('save_post_press_course', [__CLASS__, 'save'], 10, 2);
     }
 
+
+    private static function get_default_certificate_html(): string
+    {
+        return '
+<div class="presslms-cert">
+  <div class="presslms-cert__logo">
+    <img src="{{logo_url}}" alt="Logo">
+  </div>
+
+  <div class="presslms-cert__title">Certificado de Conclusão</div>
+  <div class="presslms-cert__subtitle">Certificamos que</div>
+
+  <div class="presslms-cert__student">{{student_name}}</div>
+
+  <div class="presslms-cert__text">
+    concluiu com êxito o curso
+  </div>
+
+  <div class="presslms-cert__course">{{course_name}}</div>
+
+  <div class="presslms-cert__text">
+    {{certificate_description}}
+  </div>
+
+  <div class="presslms-cert__meta">
+    <strong>Duração:</strong> {{course_duration}} &nbsp;&nbsp;|&nbsp;&nbsp;
+    <strong>Concluído em:</strong> {{completion_date}}
+  </div>
+
+  <div class="presslms-cert__footer">
+    <div class="presslms-cert__signature">
+      <img src="{{signature_url}}" alt="Assinatura">
+      <div class="presslms-cert__line"></div>
+      <div class="presslms-cert__label">Assinatura</div>
+    </div>
+  </div>
+</div>';
+    }
+
     public static function add_boxes()
     {
         add_meta_box(
@@ -113,6 +152,38 @@ class PRESS_LMS_Course_Meta
         echo '</div>';
 
         echo '</div>';
+
+        $certificate_html = (string) get_post_meta($post->ID, '_press_course_certificate_html', true);
+
+        if ($certificate_html === '') {
+            $certificate_html = self::get_default_certificate_html();
+        }
+
+        echo '<hr>';
+        echo '<h3 style="margin:18px 0 12px;">Layout do Certificado</h3>';
+        echo '<p style="color:#666;margin-bottom:8px;">Você pode personalizar o HTML do certificado usando os placeholders abaixo:</p>';
+
+        echo '<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;margin-bottom:12px;">';
+        echo '<code>{{student_name}}</code> ';
+        echo '<code>{{course_name}}</code> ';
+        echo '<code>{{course_duration}}</code> ';
+        echo '<code>{{completion_date}}</code> ';
+        echo '<code>{{certificate_description}}</code> ';
+        echo '<code>{{logo_url}}</code> ';
+        echo '<code>{{signature_url}}</code>';
+        echo '</div>';
+
+        wp_editor(
+            $certificate_html,
+            'press_course_certificate_html',
+            [
+                'textarea_name' => 'press_course_certificate_html',
+                'textarea_rows' => 18,
+                'media_buttons' => false,
+                'teeny'         => false,
+                'quicktags'     => true,
+            ]
+        );
 ?>
         <script>
             (function($) {
@@ -169,14 +240,26 @@ class PRESS_LMS_Course_Meta
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (wp_is_post_revision($post_id)) return;
         if (!current_user_can('edit_post', $post_id)) return;
-
+        if (isset($_POST['press_course_certificate_html'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_certificate_html',
+                wp_kses_post($_POST['press_course_certificate_html'])
+            );
+        }
         // Salva preço
         if (isset($_POST['press_course_price'])) {
             $raw = str_replace(',', '.', sanitize_text_field($_POST['press_course_price']));
             $raw = preg_replace('/[^0-9.]/', '', $raw);
             update_post_meta($post_id, '_press_course_price', $raw);
         }
-
+        if (isset($_POST['press_course_certificate_html'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_certificate_html',
+                wp_kses_post($_POST['press_course_certificate_html'])
+            );
+        }
         // Salva trailer
         if (isset($_POST['press_course_trailer'])) {
             update_post_meta($post_id, '_press_course_trailer', esc_url_raw($_POST['press_course_trailer']));
