@@ -199,9 +199,9 @@ class PRESS_LMS_Frontend
         $course = get_page_by_path($slug, OBJECT, 'press_course');
 
         self::header('Curso - Pressplay');
-        echo '<div class="press-container"><div class="press-card">';
 
         if (!$course) {
+            echo '<div class="press-container"><div class="press-card">';
             echo '<h1 class="press-title">Curso não encontrado</h1>';
             echo '</div></div>';
             self::footer();
@@ -210,55 +210,31 @@ class PRESS_LMS_Frontend
 
         $user_id = get_current_user_id();
         $can_access = PRESS_LMS_Enrollments::can_access_course($user_id, (int)$course->ID);
-
         $trailer = get_post_meta($course->ID, '_press_course_trailer', true);
-
-        echo '<h1 class="press-title">' . esc_html($course->post_title) . '</h1>';
-
-        if (has_post_thumbnail($course->ID)) {
-            echo get_the_post_thumbnail($course->ID, 'large', ['style' => 'width:100%;height:auto;border-radius:12px;margin:12px 0;']);
-        }
-
-        if ($trailer) {
-            $embed = wp_oembed_get($trailer);
-            if ($embed) {
-                echo '<div style="margin:16px 0;">' . $embed . '</div>';
-            }
-        }
-
-        // Conteúdo/vitrine do curso sempre aparece
-        echo '<div class="press-content">';
-        echo apply_filters('the_content', $course->post_content);
-        echo '</div>';
-
-        // Se não tem acesso, mostra CTA e encerra sem mostrar cabeçalhos soltos
-        if (!$can_access) {
-            echo '<hr>';
-            self::render_enroll_cta((int)$course->ID);
-            echo '</div></div>';
-            self::footer();
-            return;
-        }
-
-        // Lista aulas vinculadas (apenas para matriculados/admin)
         $lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
-
-        // Só imprime a seção Aulas se fizer sentido
-        if ($lessons && count($lessons) > 0) {
-            echo '<hr>';
-            echo '<h2 style="margin-top:10px;">Aulas</h2>';
-            echo '<ul class="press-list">';
-            foreach ($lessons as $lesson) {
-                $url = home_url('/curso/' . $slug . '/aula/' . $lesson->post_name);
-                echo '<li><a class="press-link" href="' . esc_url($url) . '">' . esc_html($lesson->post_title) . '</a></li>';
-            }
-            echo '</ul>';
-        } else {
-            echo '<hr>';
-            echo '<p class="press-muted">Nenhuma aula cadastrada ainda.</p>';
+        $first_lesson_url = '';
+        if (!empty($lessons[0]) && $lessons[0] instanceof WP_Post) {
+            $first_lesson_url = home_url('/curso/' . $slug . '/aula/' . $lessons[0]->post_name . '/');
         }
 
-        echo '</div></div>';
+        $course_slug_var      = $slug;
+        $course_var           = $course;
+        $can_access_var       = $can_access;
+        $trailer_var          = (string) $trailer;
+        $first_lesson_url_var = $first_lesson_url;
+        $product_id_var       = PRESS_LMS_Enrollments::get_course_product_id((int) $course->ID);
+
+        $template = trailingslashit(PRESS_LMS_PATH) . 'templates/frontend/single-press_course.php';
+
+        if (file_exists($template)) {
+            include $template;
+        } else {
+            echo '<div class="press-container"><div class="press-card">';
+            echo '<h1 class="press-title">Template não encontrado</h1>';
+            echo '<p class="press-muted">Esperado em: ' . esc_html($template) . '</p>';
+            echo '</div></div>';
+        }
+
         self::footer();
     }
 
