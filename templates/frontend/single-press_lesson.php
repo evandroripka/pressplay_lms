@@ -340,3 +340,12 @@ if (!function_exists('presslms_format_seconds')) {
     </div>
   </div>
 </div>
+<script>
+window.presslmsLessonData = {
+  ajaxUrl: "<?php echo esc_js(admin_url('admin-ajax.php')); ?>",
+  nonce: "<?php echo esc_js(wp_create_nonce('presslms_track_progress')); ?>",
+  courseId: <?php echo (int) $course->ID; ?>,
+  lessonId: <?php echo (int) $lesson->ID; ?>,
+  vimeoId: <?php echo (int) $vimeo_id; ?>
+};
+</script>

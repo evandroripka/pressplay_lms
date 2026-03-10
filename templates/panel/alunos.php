@@ -156,7 +156,7 @@ function presslms_admin_student_progress_percent($completed, $total)
                                 <tr>
                                     <td>
                                         <div class="presslms-student-cell">
-                                            
+
                                             <div>
                                                 <strong><?php echo esc_html($student->full_name ?: 'Sem nome'); ?></strong>
                                                 <?php if (!empty($student->phone_raw)): ?>
@@ -179,6 +179,9 @@ function presslms_admin_student_progress_percent($completed, $total)
                                     <td style="min-width:160px;">
                                         <div class="presslms-progress-meta">
                                             <?php echo esc_html($progress); ?>%
+                                            <span class="presslms-muted-inline">
+                                                (<?php echo (int) $student->completed_lessons; ?>/<?php echo (int) $student->total_lessons; ?> aulas)
+                                            </span>
                                         </div>
                                         <progress class="progress is-link is-small mb-0" value="<?php echo esc_attr($progress); ?>" max="100">
                                             <?php echo esc_html($progress); ?>%

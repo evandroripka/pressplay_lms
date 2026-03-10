@@ -241,10 +241,10 @@ class PRESS_LMS_Settings
             $params[] = $filter_status;
         }
 
-      if ($filter_search !== '') {
-    $like = '%' . $wpdb->esc_like($filter_search) . '%';
+        if ($filter_search !== '') {
+            $like = '%' . $wpdb->esc_like($filter_search) . '%';
 
-    $where[] = "(
+            $where[] = "(
         st.full_name LIKE %s
         OR u.display_name LIKE %s
         OR u.user_nicename LIKE %s
@@ -253,13 +253,13 @@ class PRESS_LMS_Settings
         OR c.post_title LIKE %s
     )";
 
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-}
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
 
         $order_by = "e.created_at DESC";
 
@@ -282,68 +282,69 @@ class PRESS_LMS_Settings
         $where_sql = implode(' AND ', $where);
 
         $sql = "
+    SELECT
+        e.id,
+        e.user_id,
+        e.course_id,
+        e.status,
+        e.order_ref,
+        e.payment_provider,
+        e.created_at,
+        e.updated_at,
+        e.purchased_at,
+        e.expires_at,
+
+        COALESCE(NULLIF(st.full_name, ''), NULLIF(u.display_name, ''), NULLIF(u.user_nicename, ''), 'Sem nome') AS full_name,
+        st.phone_raw,
+        st.phone_e164,
+
+        u.user_email,
+        u.display_name,
+
+        c.post_title AS course_title,
+
+        COALESCE(pr.completed_lessons, 0) AS completed_lessons,
+        COALESCE(tl.total_lessons, 0) AS total_lessons
+
+    FROM {$table_enrollments} e
+
+    LEFT JOIN {$table_students} st
+        ON st.user_id = e.user_id
+
+    LEFT JOIN {$users_table} u
+        ON u.ID = e.user_id
+
+    LEFT JOIN {$posts_table} c
+        ON c.ID = e.course_id
+
+    LEFT JOIN (
         SELECT
-            e.id,
-            e.user_id,
-            e.course_id,
-            e.status,
-            e.order_ref,
-            e.payment_provider,
-            e.created_at,
-            e.updated_at,
-            e.purchased_at,
-            e.expires_at,
+            user_id,
+            course_id,
+            SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed_lessons
+        FROM {$table_progress}
+        GROUP BY user_id, course_id
+    ) pr
+        ON pr.user_id = e.user_id
+        AND pr.course_id = e.course_id
 
-            COALESCE(NULLIF(st.full_name, ''), NULLIF(u.display_name, ''), NULLIF(u.user_nicename, ''), 'Sem nome') AS full_name,
-st.phone_raw,
-st.phone_e164,
-u.user_email,
-u.display_name,
+    LEFT JOIN (
+        SELECT
+            pm.meta_value AS course_id,
+            COUNT(p.ID) AS total_lessons
+        FROM {$posts_table} p
+        INNER JOIN {$postmeta_table} pm
+            ON pm.post_id = p.ID
+            AND pm.meta_key = '_press_lesson_course_id'
+        WHERE p.post_type = 'press_lesson'
+          AND p.post_status = 'publish'
+        GROUP BY pm.meta_value
+    ) tl
+        ON tl.course_id = e.course_id
 
-            c.post_title AS course_title,
-
-            COALESCE(pr.completed_lessons, 0) AS completed_lessons,
-            COALESCE(tl.total_lessons, 0) AS total_lessons
-
-        FROM {$table_enrollments} e
-
-        LEFT JOIN {$table_students} st
-            ON st.user_id = e.user_id
-
-        LEFT JOIN {$users_table} u
-            ON u.ID = e.user_id
-
-        LEFT JOIN {$posts_table} c
-            ON c.ID = e.course_id
-
-        LEFT JOIN (
-            SELECT
-                user_id,
-                course_id,
-                SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed_lessons
-            FROM {$table_progress}
-            GROUP BY user_id, course_id
-        ) pr
-            ON pr.user_id = e.user_id
-            AND pr.course_id = e.course_id
-
-        LEFT JOIN (
-            SELECT
-                pm.meta_value AS course_id,
-                COUNT(p.ID) AS total_lessons
-            FROM {$posts_table} p
-            INNER JOIN {$postmeta_table} pm
-                ON pm.post_id = p.ID
-                AND pm.meta_key = '_press_lesson_course_id'
-            WHERE p.post_type = 'press_lesson'
-              AND p.post_status = 'publish'
-            GROUP BY pm.meta_value
-        ) tl
-            ON tl.course_id = e.course_id
-
-        WHERE {$where_sql}
-        ORDER BY {$order_by}
-    ";
+    WHERE {$where_sql}
+    ORDER BY {$order_by}
+";
 
         if (!empty($params)) {
             $sql = $wpdb->prepare($sql, $params);

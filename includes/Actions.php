@@ -10,7 +10,7 @@ class PRESS_LMS_Actions
 
         add_action('admin_post_press_lms_enroll_continue', [__CLASS__, 'handle_enroll_continue']);
         add_action('admin_post_nopriv_press_lms_enroll_continue', [__CLASS__, 'handle_enroll_continue']);
-
+        add_action('wp_ajax_press_lms_track_progress', [__CLASS__, 'ajax_track_progress']);
         // Faz o WooCommerce respeitar redirect_to no login/registro
         add_filter('woocommerce_login_redirect', [__CLASS__, 'woo_login_redirect'], 10, 2);
         add_filter('woocommerce_registration_redirect', [__CLASS__, 'woo_registration_redirect'], 10, 1);
@@ -107,6 +107,47 @@ class PRESS_LMS_Actions
                 PRESSLMS_Duration::recalc_course_total_duration($course_id);
             }
         }, 20, 3);
+    }
+    public static function ajax_track_progress()
+    {
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Usuário não autenticado.'], 401);
+        }
+
+        check_ajax_referer('presslms_track_progress', 'nonce');
+
+        $user_id = get_current_user_id();
+        $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
+        $lesson_id = isset($_POST['lesson_id']) ? (int) $_POST['lesson_id'] : 0;
+        $watched_seconds = isset($_POST['watched_seconds']) ? (int) $_POST['watched_seconds'] : 0;
+        $completed = !empty($_POST['completed']) ? 1 : 0;
+
+        if ($course_id <= 0 || $lesson_id <= 0) {
+            wp_send_json_error(['message' => 'Dados inválidos.'], 400);
+        }
+
+        if (!class_exists('PRESS_LMS_Enrollments') || !PRESS_LMS_Enrollments::can_access_course($user_id, $course_id)) {
+            wp_send_json_error(['message' => 'Sem acesso ao curso.'], 403);
+        }
+
+        if (class_exists('PRESS_LMS_Progress')) {
+            PRESS_LMS_Progress::upsert_progress(
+                $user_id,
+                $course_id,
+                $lesson_id,
+                $watched_seconds,
+                $completed
+            );
+        }
+
+        $percent = class_exists('PRESS_LMS_Progress')
+            ? PRESS_LMS_Progress::get_course_progress_percent($user_id, $course_id)
+            : 0;
+
+        wp_send_json_success([
+            'message' => 'Progresso salvo.',
+            'course_progress_percent' => $percent,
+        ]);
     }
     public static function ajax_change_student_password()
     {

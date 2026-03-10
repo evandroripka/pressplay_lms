@@ -44,6 +44,7 @@ require_once PRESS_LMS_PATH . 'includes/Vimeo.php';
 require_once PRESS_LMS_PATH . 'includes/class-presslms-assets.php';
 require_once PRESS_LMS_PATH . 'includes/Duration.php';
 require_once PRESS_LMS_PATH . 'includes/Metabox_Teacher.php';
+require_once PRESS_LMS_PATH . 'includes/Progress.php';
 // Hooks ativação
 register_activation_hook(__FILE__, ['PRESS_LMS_Activator', 'activate']);
 register_deactivation_hook(__FILE__, ['PRESS_LMS_Deactivator', 'deactivate']);
