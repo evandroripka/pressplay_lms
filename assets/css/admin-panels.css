@@ -97,7 +97,13 @@
 .presslms-admin-page--students .progress {
   height: 8px;
 }
-
+.presslms-admin-page .select select,
+.presslms-admin-page select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none !important;
+}
 @media (max-width: 1100px) {
   .presslms-table {
     min-width: 1100px;

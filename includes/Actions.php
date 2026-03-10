@@ -14,7 +14,7 @@ class PRESS_LMS_Actions
         // Faz o WooCommerce respeitar redirect_to no login/registro
         add_filter('woocommerce_login_redirect', [__CLASS__, 'woo_login_redirect'], 10, 2);
         add_filter('woocommerce_registration_redirect', [__CLASS__, 'woo_registration_redirect'], 10, 1);
-
+        add_action('wp_ajax_press_lms_change_student_password', [__CLASS__, 'ajax_change_student_password']);
         add_action('save_post_press_lesson', function ($post_id, $post, $update) {
 
             // Segurança básica
@@ -108,7 +108,39 @@ class PRESS_LMS_Actions
             }
         }, 20, 3);
     }
+    public static function ajax_change_student_password()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Sem permissão.'], 403);
+        }
 
+        check_ajax_referer('presslms_admin_nonce', 'nonce');
+
+        $user_id = isset($_POST['user_id']) ? (int) $_POST['user_id'] : 0;
+        $new_password = isset($_POST['new_password']) ? (string) $_POST['new_password'] : '';
+
+        if ($user_id <= 0) {
+            wp_send_json_error(['message' => 'Usuário inválido.'], 400);
+        }
+
+        $user = get_userdata($user_id);
+        if (!$user) {
+            wp_send_json_error(['message' => 'Usuário não encontrado.'], 404);
+        }
+
+        $new_password = trim($new_password);
+
+        if (strlen($new_password) < 6) {
+            wp_send_json_error(['message' => 'A senha deve ter pelo menos 6 caracteres.'], 400);
+        }
+
+        // Usa o core do WordPress para garantir compatibilidade
+        wp_set_password($new_password, $user_id);
+
+        wp_send_json_success([
+            'message' => 'Senha alterada com sucesso.'
+        ]);
+    }
     /**
      * Clique no botão "Matricular"
      */

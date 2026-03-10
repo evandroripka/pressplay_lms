@@ -241,13 +241,25 @@ class PRESS_LMS_Settings
             $params[] = $filter_status;
         }
 
-        if ($filter_search !== '') {
-            $like = '%' . $wpdb->esc_like($filter_search) . '%';
-            $where[] = "(st.full_name LIKE %s OR u.user_email LIKE %s OR c.post_title LIKE %s)";
-            $params[] = $like;
-            $params[] = $like;
-            $params[] = $like;
-        }
+      if ($filter_search !== '') {
+    $like = '%' . $wpdb->esc_like($filter_search) . '%';
+
+    $where[] = "(
+        st.full_name LIKE %s
+        OR u.display_name LIKE %s
+        OR u.user_nicename LIKE %s
+        OR u.user_login LIKE %s
+        OR u.user_email LIKE %s
+        OR c.post_title LIKE %s
+    )";
+
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+}
 
         $order_by = "e.created_at DESC";
 
@@ -399,6 +411,26 @@ u.display_name,
             ['presslms-bulma', 'press-lms-admin'],
             PRESS_LMS_VERSION
         );
+        wp_enqueue_script(
+            'sweetalert2',
+            'https://cdn.jsdelivr.net/npm/sweetalert2@11',
+            [],
+            '11',
+            true
+        );
+
+        wp_enqueue_script(
+            'presslms-admin-panels-js',
+            PRESS_LMS_URL . 'assets/js/admin-panels.js',
+            ['jquery', 'sweetalert2'],
+            PRESS_LMS_VERSION,
+            true
+        );
+
+        wp_localize_script('presslms-admin-panels-js', 'presslmsAdmin', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('presslms_admin_nonce'),
+        ]);
     }
     private static function render_panel_template($template_file, array $vars = [])
     {

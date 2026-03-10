@@ -9,7 +9,8 @@ $filter_status = (string) ($filter_status ?? '');
 $filter_search = (string) ($filter_search ?? '');
 $filter_sort   = (string) ($filter_sort ?? 'date_desc');
 
-function presslms_admin_student_progress_percent($completed, $total) {
+function presslms_admin_student_progress_percent($completed, $total)
+{
     $completed = (int) $completed;
     $total = (int) $total;
 
@@ -155,9 +156,7 @@ function presslms_admin_student_progress_percent($completed, $total) {
                                 <tr>
                                     <td>
                                         <div class="presslms-student-cell">
-                                            <div class="presslms-student-avatar">
-                                                <?php echo esc_html(mb_strtoupper(mb_substr((string) $student->full_name, 0, 1))); ?>
-                                            </div>
+                                            
                                             <div>
                                                 <strong><?php echo esc_html($student->full_name ?: 'Sem nome'); ?></strong>
                                                 <?php if (!empty($student->phone_raw)): ?>
@@ -204,9 +203,14 @@ function presslms_admin_student_progress_percent($completed, $total) {
 
                                     <td>
                                         <div class="buttons are-small mb-0 presslms-table-actions">
-                                            <button type="button" class="button is-light presslms-btn-action">Senha</button>
-                                            <button type="button" class="button is-danger is-light presslms-btn-action">Cancelar</button>
-                                            <button type="button" class="button is-success is-light presslms-btn-action">Certificado</button>
+                                            <button
+                                                type="button"
+                                                class="button is-light presslms-btn-action js-presslms-change-password"
+                                                data-user-id="<?php echo esc_attr($student->user_id); ?>"
+                                                data-student-name="<?php echo esc_attr($student->full_name ?: 'Aluno'); ?>">Alterar Senha
+                                            </button>
+                                            <button type="button" class="button is-danger is-light presslms-btn-action">Bloquear Acesso</button>
+                                            <button type="button" class="button is-success is-light presslms-btn-action">Emitir Certificado</button>
                                         </div>
                                     </td>
                                 </tr>
