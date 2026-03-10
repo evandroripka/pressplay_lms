@@ -7,13 +7,10 @@ class PRESS_LMS_Woo
     {
         // cria/atualiza produto quando salvar curso
         add_action('save_post_press_course', [__CLASS__, 'maybe_sync_product'], 20, 2);
-
         // cria pending ao adicionar no carrinho pela loja normal
         add_action('woocommerce_add_to_cart', [__CLASS__, 'handle_add_to_cart'], 10, 6);
-
         // garante pending quando o pedido é criado no checkout
         add_action('woocommerce_checkout_order_processed', [__CLASS__, 'handle_order_processed'], 10, 3);
-
         // ativa matrícula quando pedido for pago/processado
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_completed'], 10, 1);
         add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);

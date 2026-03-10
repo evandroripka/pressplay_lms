@@ -20,9 +20,12 @@ class PRESS_LMS_Progress
         $existing = $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$table}
-                 WHERE user_id = %d AND lesson_id = %d
+                 WHERE user_id = %d
+                   AND course_id = %d
+                   AND lesson_id = %d
                  LIMIT 1",
                 $user_id,
+                $course_id,
                 $lesson_id
             )
         );
@@ -35,6 +38,7 @@ class PRESS_LMS_Progress
                 'updated_at'      => $now,
             ];
 
+            // só marca completed, nunca desmarca
             if ((int)$completed === 1 && (int)$existing->completed !== 1) {
                 $data['completed'] = 1;
                 $data['completed_at'] = $now;
@@ -62,10 +66,12 @@ class PRESS_LMS_Progress
     {
         global $wpdb;
         $table = PRESS_LMS_Database::table('progress');
+
         return $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$table}
-                 WHERE user_id = %d AND lesson_id = %d
+                 WHERE user_id = %d
+                   AND lesson_id = %d
                  LIMIT 1",
                 $user_id,
                 $lesson_id

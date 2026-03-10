@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!window.presslmsLessonData) return;
   if (typeof Vimeo === 'undefined') return;
 
-  const data = window.presslmsLessonData;
   const iframe = document.querySelector('.presslms-player__ratio iframe');
   if (!iframe) return;
 
@@ -11,7 +10,14 @@ document.addEventListener('DOMContentLoaded', function () {
   let duration = 0;
   let lastKnownSeconds = 0;
   let markedCompleted = false;
-  let isSending = false;
+
+  // evita posts duplicados inúteis, mas sem bloquear ended
+  let lastSentSeconds = -1;
+  let lastSentCompleted = null;
+
+  function getLessonData() {
+    return window.presslmsLessonData || {};
+  }
 
   function shouldMarkCompleted(seconds) {
     if (markedCompleted) return true;
@@ -20,31 +26,53 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function buildPayload(seconds, completed = false) {
+    const data = getLessonData();
+
     const params = new URLSearchParams();
     params.append('action', 'press_lms_track_progress');
-    params.append('nonce', data.nonce);
-    params.append('course_id', String(data.courseId));
-    params.append('lesson_id', String(data.lessonId));
-    params.append('watched_seconds', String(Math.floor(seconds)));
+    params.append('nonce', data.nonce || '');
+    params.append('course_id', String(data.courseId || 0));
+    params.append('lesson_id', String(data.lessonId || 0));
+    params.append('watched_seconds', String(Math.floor(seconds || 0)));
     params.append('completed', completed ? '1' : '0');
+
     return params;
   }
 
+  function shouldSkipSend(seconds, completed) {
+    const normalizedSeconds = Math.floor(seconds || 0);
+
+    return (
+      normalizedSeconds === lastSentSeconds &&
+      completed === lastSentCompleted
+    );
+  }
+
+  function markAsSent(seconds, completed) {
+    lastSentSeconds = Math.floor(seconds || 0);
+    lastSentCompleted = completed;
+  }
+
   function sendProgress(seconds, completed = false, useBeacon = false) {
-    const payload = buildPayload(seconds, completed);
+    const normalizedSeconds = Math.floor(seconds || 0);
+
+    if (shouldSkipSend(normalizedSeconds, completed)) {
+      return Promise.resolve();
+    }
+
+    const payload = buildPayload(normalizedSeconds, completed);
 
     if (useBeacon && navigator.sendBeacon) {
       const blob = new Blob([payload.toString()], {
         type: 'application/x-www-form-urlencoded; charset=UTF-8'
       });
-      navigator.sendBeacon(data.ajaxUrl, blob);
+
+      navigator.sendBeacon(getLessonData().ajaxUrl, blob);
+      markAsSent(normalizedSeconds, completed);
       return Promise.resolve();
     }
 
-    if (isSending) return Promise.resolve();
-    isSending = true;
-
-    return fetch(data.ajaxUrl, {
+    return fetch(getLessonData().ajaxUrl, {
       method: 'POST',
       body: payload,
       credentials: 'same-origin',
@@ -53,11 +81,12 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     })
       .then(r => r.json())
+      .then(res => {
+        markAsSent(normalizedSeconds, completed);
+        return res;
+      })
       .catch(err => {
         console.error('Erro ao salvar progresso:', err);
-      })
-      .finally(() => {
-        isSending = false;
       });
   }
 
@@ -83,43 +112,23 @@ document.addEventListener('DOMContentLoaded', function () {
       markedCompleted = true;
     }
 
-    sendProgress(seconds, completed, false);
+    // salva em toda pausa real acima de 0
+    if (seconds > 0) {
+      sendProgress(seconds, completed, false);
+    }
   });
 
   player.on('ended', function () {
     markedCompleted = true;
 
     player.getCurrentTime().then(function (seconds) {
-      sendProgress(seconds, true, false);
+      sendProgress(seconds || duration || lastKnownSeconds || 0, true, false);
     }).catch(function () {
       sendProgress(lastKnownSeconds || duration || 0, true, false);
     });
   });
 
-  // Salva ao clicar em links de aula / navegação interna
-  document.addEventListener('click', function (e) {
-    const link = e.target.closest('a');
-    if (!link) return;
-
-    const href = link.getAttribute('href') || '';
-    const isLessonLink =
-      link.classList.contains('presslms-lessons__item') ||
-      href.indexOf('/aula/') !== -1;
-
-    if (!isLessonLink) return;
-
-    player.getCurrentTime().then(function (seconds) {
-      const completed = shouldMarkCompleted(seconds);
-      if (completed) {
-        markedCompleted = true;
-      }
-      sendProgress(seconds, completed, true);
-    }).catch(function () {
-      sendProgress(lastKnownSeconds || 0, markedCompleted, true);
-    });
-  });
-
-  // Melhor que beforeunload para esse caso
+  // fallback ao sair da página
   window.addEventListener('pagehide', function () {
     sendProgress(lastKnownSeconds || 0, markedCompleted, true);
   });

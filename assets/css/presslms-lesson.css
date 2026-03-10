@@ -264,11 +264,13 @@
 }
 
 .presslms-instructor__bio {
-  margin-top: 12px;
-  color: var(--pl-muted);
-  line-height: 1.65;
+    margin-top: 12px;
+    color: var(--pl-muted);
+    line-height: 25px;
+    font-size: 15px;
+    font-style: italic;
+    font-weight: 400;
 }
-
 .presslms-instructor__bio p {
   margin: 0 0 10px 0;
 }
