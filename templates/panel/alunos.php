@@ -213,7 +213,16 @@ function presslms_admin_student_progress_percent($completed, $total)
                                                 data-student-name="<?php echo esc_attr($student->full_name ?: 'Aluno'); ?>">Alterar Senha
                                             </button>
                                             <button type="button" class="button is-danger is-light presslms-btn-action">Bloquear Acesso</button>
-                                            <button type="button" class="button is-success is-light presslms-btn-action">Emitir Certificado</button>
+                                            <a
+                                                class="button is-success is-light presslms-btn-action"
+                                                target="_blank"
+                                                href="<?php echo esc_url(
+                                                            admin_url(
+                                                                'admin-post.php?action=press_lms_preview_certificate&course_id=' . (int)$student->course_id . '&user_id=' . (int)$student->user_id
+                                                            )
+                                                        ); ?>">
+                                                Emitir Certificado
+                                            </a>
                                         </div>
                                     </td>
                                 </tr>

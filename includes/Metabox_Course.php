@@ -74,6 +74,90 @@ class PRESS_LMS_Course_Meta
             echo '<option value="' . esc_attr($teacher->ID) . '"' . $selected . '>' . esc_html($teacher->post_title) . '</option>';
         }
         echo '</select>';
+
+        $certificate_description = (string) get_post_meta($post->ID, '_press_course_certificate_description', true);
+        $certificate_logo_id     = (int) get_post_meta($post->ID, '_press_course_certificate_logo_id', true);
+        $certificate_sign_id     = (int) get_post_meta($post->ID, '_press_course_certificate_signature_id', true);
+
+        $certificate_logo_url = $certificate_logo_id ? wp_get_attachment_url($certificate_logo_id) : '';
+        $certificate_sign_url = $certificate_sign_id ? wp_get_attachment_url($certificate_sign_id) : '';
+
+        echo '<hr>';
+        echo '<h3 style="margin:18px 0 12px;">Certificado</h3>';
+
+        echo '<p><label><strong>Descrição do certificado</strong></label><br>';
+        echo '<textarea name="press_course_certificate_description" class="widefat" rows="4" placeholder="Ex.: Certificamos que o aluno concluiu com êxito este curso e demonstrou domínio dos conteúdos propostos.">' . esc_textarea($certificate_description) . '</textarea></p>';
+
+        echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+
+        // Logo
+        echo '<div>';
+        echo '<label><strong>Logo do certificado</strong></label>';
+        echo '<input type="hidden" name="press_course_certificate_logo_id" id="press_course_certificate_logo_id" value="' . esc_attr($certificate_logo_id) . '">';
+        echo '<input type="text" class="widefat" id="press_course_certificate_logo_url" value="' . esc_attr($certificate_logo_url) . '" readonly placeholder="Nenhuma logo selecionada">';
+        echo '<p style="margin-top:8px;">';
+        echo '<button type="button" class="button" id="press_pick_certificate_logo">Selecionar logo</button> ';
+        echo '<button type="button" class="button" id="press_clear_certificate_logo">Limpar</button>';
+        echo '</p>';
+        echo '</div>';
+
+        // Assinatura
+        echo '<div>';
+        echo '<label><strong>Assinatura do certificado</strong></label>';
+        echo '<input type="hidden" name="press_course_certificate_signature_id" id="press_course_certificate_signature_id" value="' . esc_attr($certificate_sign_id) . '">';
+        echo '<input type="text" class="widefat" id="press_course_certificate_signature_url" value="' . esc_attr($certificate_sign_url) . '" readonly placeholder="Nenhuma assinatura selecionada">';
+        echo '<p style="margin-top:8px;">';
+        echo '<button type="button" class="button" id="press_pick_certificate_signature">Selecionar assinatura</button> ';
+        echo '<button type="button" class="button" id="press_clear_certificate_signature">Limpar</button>';
+        echo '</p>';
+        echo '</div>';
+
+        echo '</div>';
+?>
+        <script>
+            (function($) {
+                function openMedia(targetId, targetUrlId, title) {
+                    const frame = wp.media({
+                        title: title,
+                        button: {
+                            text: 'Usar imagem'
+                        },
+                        multiple: false
+                    });
+
+                    frame.on('select', function() {
+                        const attachment = frame.state().get('selection').first().toJSON();
+                        $('#' + targetId).val(attachment.id);
+                        $('#' + targetUrlId).val(attachment.url);
+                    });
+
+                    frame.open();
+                }
+
+                $('#press_pick_certificate_logo').on('click', function(e) {
+                    e.preventDefault();
+                    openMedia('press_course_certificate_logo_id', 'press_course_certificate_logo_url', 'Selecionar logo do certificado');
+                });
+
+                $('#press_pick_certificate_signature').on('click', function(e) {
+                    e.preventDefault();
+                    openMedia('press_course_certificate_signature_id', 'press_course_certificate_signature_url', 'Selecionar assinatura do certificado');
+                });
+
+                $('#press_clear_certificate_logo').on('click', function(e) {
+                    e.preventDefault();
+                    $('#press_course_certificate_logo_id').val('');
+                    $('#press_course_certificate_logo_url').val('');
+                });
+
+                $('#press_clear_certificate_signature').on('click', function(e) {
+                    e.preventDefault();
+                    $('#press_course_certificate_signature_id').val('');
+                    $('#press_course_certificate_signature_url').val('');
+                });
+            })(jQuery);
+        </script>
+<?php
     }
 
     public static function save($post_id, $post)
@@ -102,5 +186,28 @@ class PRESS_LMS_Course_Meta
         }
         // ❌ Removido: salvar product_id manualmente
         // Isso agora é responsabilidade do PRESS_LMS_Woo (criação automática).
+        if (isset($_POST['press_course_certificate_description'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_certificate_description',
+                wp_kses_post($_POST['press_course_certificate_description'])
+            );
+        }
+
+        if (isset($_POST['press_course_certificate_logo_id'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_certificate_logo_id',
+                (int) $_POST['press_course_certificate_logo_id']
+            );
+        }
+
+        if (isset($_POST['press_course_certificate_signature_id'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_certificate_signature_id',
+                (int) $_POST['press_course_certificate_signature_id']
+            );
+        }
     }
 }
