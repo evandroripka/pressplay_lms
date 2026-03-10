@@ -21,19 +21,21 @@ if (function_exists('wc_get_cart_url') && $product_id > 0) {
   <div class="presslms__container">
     <header class="presslms-course-hero">
       <div class="presslms-course-hero__left">
-        <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?> 2</h1>
+        <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?></h1>
         <div class="presslms-course-hero__meta">
           <span class="presslms-chip">
             <i class="fa-light fa-circle-info"></i>
             Última atualização: <b><?php echo esc_html(get_the_modified_date('d/m/Y', $course)); ?></b>
           </span>
+          <span class="presslms-chip">
           <?php
           $teacher_id = (int) get_post_meta($course->ID, '_press_course_teacher', true);
           if ($teacher_id) {
             $teacher = get_post($teacher_id);
-            echo '<h3>Instrutor: ' . esc_html($teacher->post_title) . '</h3>';
+            echo 'Instrutor: <b>' . esc_html($teacher->post_title) . '</b>';
           }
           ?>
+          </span>
           <span class="presslms-chip">
             <i class="fa-light fa-layer-group"></i>
             <b><?php echo esc_html(count($lessons)); ?></b> aulas

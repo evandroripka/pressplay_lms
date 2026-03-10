@@ -111,21 +111,25 @@ pressplay-lms/
 │   └── js/
 │
 ├── includes/
-│   ├── Activator.php
-│   ├── Deactivator.php
+│   ├── Core/
+│   │   ├── Activator.php
+│   │   ├── Assets.php
+│   │   ├── Deactivator.php
+│   │   ├── Dependencies.php
+│   │   ├── Plugin.php
+│   │   ├── Rewrite.php
+│   │   └── Templates.php
+│   ├── Support/
+│   │   └── Helpers.php
 │   ├── CPT.php
 │   ├── Database.php
-│   ├── Dependencies.php
 │   ├── Enrollments.php
 │   ├── Frontend.php
-│   ├── Helpers.php
 │   ├── Mailer.php
 │   ├── Metabox_Course.php
 │   ├── Metabox_Lesson.php
-│   ├── Rewrite.php
 │   ├── Roles.php
 │   ├── Settings.php
-│   ├── Templates.php
 │   └── Woo.php
 │
 ├── pressplay-lms.php

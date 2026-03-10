@@ -21,6 +21,32 @@ if (class_exists('PRESS_LMS_Materials')) {
 // duração por meta (vamos preencher via API depois)
 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
 $course_duration = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
+$course_url = home_url('/curso/' . $course_slug . '/');
+$product_id = class_exists('PRESS_LMS_Enrollments')
+  ? PRESS_LMS_Enrollments::get_course_product_id((int) $course->ID)
+  : 0;
+$can_access_course = class_exists('PRESS_LMS_Enrollments')
+  ? PRESS_LMS_Enrollments::can_access_course(get_current_user_id(), (int) $course->ID)
+  : false;
+
+$buy_url = '#';
+if (function_exists('wc_get_cart_url') && $product_id > 0) {
+  $buy_url = add_query_arg('add-to-cart', $product_id, wc_get_cart_url());
+}
+
+$lessons_list = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
+$current_lesson_number = 0;
+
+foreach ($lessons_list as $index => $listed_lesson) {
+  if ((int) $listed_lesson->ID === (int) $lesson->ID) {
+    $current_lesson_number = $index + 1;
+    break;
+  }
+}
+
+$lesson_breadcrumb_label = $current_lesson_number > 0
+  ? sprintf('Aula %02d', $current_lesson_number)
+  : wp_html_excerpt($lesson->post_title, 26, '...');
 
 // =====================================================
 // Instrutor da aula
@@ -100,13 +126,25 @@ if (!function_exists('presslms_format_seconds')) {
               Aula: <b><?php echo esc_html(presslms_format_seconds($lesson_duration)); ?></b>
             </span>
           </div>
+          <nav class="presslms-breadcrumbs presslms-breadcrumbs--compact" aria-label="Breadcrumb">
+            <a href="<?php echo esc_url($course_url); ?>">Curso</a>
+            <span>&gt;</span>
+            <span class="presslms-breadcrumbs__current" aria-current="page"><?php echo esc_html($lesson_breadcrumb_label); ?></span>
+          </nav>
         </div>
       </div>
       <div class="presslms-topbar__right">
-        <a class="presslms-btn presslms-btn--primary" href="#">
-          <i class="fa-light fa-bag-shopping"></i>
-          Comprar Curso
-        </a>
+        <?php if ($can_access_course): ?>
+          <a class="presslms-btn presslms-btn--primary" href="<?php echo esc_url($course_url); ?>">
+            <i class="fa-light fa-arrow-left-long"></i>
+            Voltar ao Curso
+          </a>
+        <?php else: ?>
+          <a class="presslms-btn presslms-btn--primary" href="<?php echo esc_url($buy_url); ?>">
+            <i class="fa-light fa-bag-shopping"></i>
+            Comprar Curso
+          </a>
+        <?php endif; ?>
       </div>
     </header>
     <div class="presslms-layout">
@@ -289,8 +327,6 @@ if (!function_exists('presslms_format_seconds')) {
           // ---------------------------------------------------------
           // Sidebar: lista real de aulas do curso
           // ---------------------------------------------------------
-          $lessons_list = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
-
           $current_lesson_id = (int) $lesson->ID;
           ?>
 
