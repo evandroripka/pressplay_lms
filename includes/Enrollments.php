@@ -3,6 +3,15 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Enrollments
 {
+    public static function is_course_paused(int $course_id): bool
+    {
+        if (class_exists('PRESS_LMS_Course_Lifecycle') && method_exists('PRESS_LMS_Course_Lifecycle', 'is_course_paused')) {
+            return PRESS_LMS_Course_Lifecycle::is_course_paused($course_id);
+        }
+
+        return false;
+    }
+
     public static function is_admin_user($user_id = null): bool
     {
         if (!$user_id) $user_id = get_current_user_id();
@@ -29,6 +38,11 @@ class PRESS_LMS_Enrollments
     public static function get_or_create_pending(int $user_id, int $course_id, string $provider = 'woocommerce'): int
     {
         global $wpdb;
+
+        if (self::is_course_paused($course_id)) {
+            return 0;
+        }
+
         self::ensure_student_role($user_id);
         $table = PRESS_LMS_Database::table('enrollments');
         $now = current_time('mysql');

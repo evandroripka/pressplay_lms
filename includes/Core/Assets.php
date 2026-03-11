@@ -75,6 +75,22 @@ class PRESSLMS_Assets
   {
     self::enqueue_shared_styles();
 
+    wp_enqueue_script(
+      'presslms-sweetalert2',
+      'https://cdn.jsdelivr.net/npm/sweetalert2@11',
+      [],
+      '11.15.10',
+      true
+    );
+
+    wp_enqueue_script(
+      'presslms-course-access-guard',
+      PRESS_LMS_URL . 'assets/js/course-access-guard.js',
+      ['presslms-sweetalert2'],
+      PRESS_LMS_VERSION,
+      true
+    );
+
     if (!wp_style_is('presslms-course', 'enqueued')) {
       wp_enqueue_style(
         'presslms-course',
@@ -83,6 +99,18 @@ class PRESSLMS_Assets
         PRESS_LMS_VERSION
       );
     }
+
+    wp_localize_script('presslms-course-access-guard', 'pressLmsCourseAccessGuard', [
+      'messages' => [
+        'lockedTitle' => 'Conteudo restrito',
+        'lockedText' => 'Voce precisa estar logado e matriculado para assistir esta aula.',
+        'pausedText' => 'Voce precisa estar logado e matriculado para assistir esta aula. Este curso esta pausado e nao aceita novas matriculas no momento.',
+        'unavailableText' => 'Voce precisa estar logado e matriculado para assistir esta aula. As matriculas nao estao disponiveis no momento.',
+        'confirmEnroll' => 'Matricular agora',
+        'cancel' => 'Cancelar',
+        'close' => 'Fechar',
+      ],
+    ]);
   }
 
   private static function enqueue_lesson_assets(): void

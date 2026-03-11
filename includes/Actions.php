@@ -197,6 +197,10 @@ class PRESS_LMS_Actions
             wp_die('Nonce inválido.');
         }
 
+        if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
+            wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
+        }
+
         if (!class_exists('WooCommerce') || !function_exists('wc_get_page_permalink')) {
             wp_die('WooCommerce é obrigatório para matrícula.');
         }
@@ -237,6 +241,10 @@ class PRESS_LMS_Actions
 
         if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'press_lms_enroll_continue_' . $course_id)) {
             wp_die('Nonce inválido.');
+        }
+
+        if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
+            wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
         }
 
         if (!is_user_logged_in()) {
@@ -283,6 +291,10 @@ class PRESS_LMS_Actions
     {
         if (!class_exists('WooCommerce') || !function_exists('WC') || !function_exists('wc_get_checkout_url')) {
             wp_die('WooCommerce é obrigatório para matrícula.');
+        }
+
+        if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused((int) $course_id)) {
+            wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
         }
 
         // matrícula pending

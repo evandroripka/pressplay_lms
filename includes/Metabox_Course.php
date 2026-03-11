@@ -3,10 +3,133 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Course_Meta
 {
+    const META_FEATURES = '_press_course_features';
+
     public static function init()
     {
         add_action('add_meta_boxes_press_course', [__CLASS__, 'add_boxes']);
         add_action('save_post_press_course', [__CLASS__, 'save'], 10, 2);
+    }
+
+    public static function get_feature_catalog(): array
+    {
+        return [
+            'video_on_demand' => [
+                'label' => 'Vídeo sob demanda',
+                'icon'  => 'fa-light fa-video',
+                'admin_icon' => 'dashicons dashicons-video-alt3',
+                'default' => true,
+            ],
+            'download_materials' => [
+                'label' => 'Materiais para download',
+                'icon'  => 'fa-light fa-file-arrow-down',
+                'admin_icon' => 'dashicons dashicons-download',
+                'default' => true,
+            ],
+            'certificate_online' => [
+                'label' => 'Certificado online',
+                'icon'  => 'fa-light fa-certificate',
+                'admin_icon' => 'dashicons dashicons-awards',
+                'default' => false,
+            ],
+            'mobile_desktop_access' => [
+                'label' => 'Acesso no celular e PC',
+                'icon'  => 'fa-light fa-mobile-screen',
+                'admin_icon' => 'dashicons dashicons-smartphone',
+                'default' => true,
+            ],
+            'captions' => [
+                'label' => 'Legendas (se houver)',
+                'icon'  => 'fa-light fa-closed-captioning',
+                'admin_icon' => 'dashicons dashicons-editor-help',
+                'default' => true,
+            ],
+            'community_access' => [
+                'label' => 'Comunidade exclusiva',
+                'icon'  => 'fa-light fa-user-group',
+                'admin_icon' => 'dashicons dashicons-groups',
+                'default' => false,
+            ],
+            'support' => [
+                'label' => 'Suporte para dúvidas',
+                'icon'  => 'fa-light fa-headset',
+                'admin_icon' => 'dashicons dashicons-sos',
+                'default' => false,
+            ],
+            'live_classes' => [
+                'label' => 'Aulas ao vivo',
+                'icon'  => 'fa-light fa-chalkboard-user',
+                'admin_icon' => 'dashicons dashicons-welcome-learn-more',
+                'default' => false,
+            ],
+            'future_updates' => [
+                'label' => 'Atualizações futuras',
+                'icon'  => 'fa-light fa-arrows-rotate',
+                'admin_icon' => 'dashicons dashicons-update',
+                'default' => false,
+            ],
+            'quizzes' => [
+                'label' => 'Exercícios e checklists',
+                'icon'  => 'fa-light fa-list-check',
+                'admin_icon' => 'dashicons dashicons-yes-alt',
+                'default' => false,
+            ],
+        ];
+    }
+
+    private static function get_default_feature_keys(): array
+    {
+        $default_keys = [];
+
+        foreach (self::get_feature_catalog() as $key => $feature) {
+            if (!empty($feature['default'])) {
+                $default_keys[] = $key;
+            }
+        }
+
+        return $default_keys;
+    }
+
+    public static function get_selected_feature_keys(int $course_id): array
+    {
+        $course_id = (int) $course_id;
+        if ($course_id <= 0) {
+            return [];
+        }
+
+        $catalog = self::get_feature_catalog();
+        $raw = get_post_meta($course_id, self::META_FEATURES, true);
+
+        if (metadata_exists('post', $course_id, self::META_FEATURES)) {
+            $selected_keys = is_array($raw) ? array_map('sanitize_key', $raw) : [];
+        } else {
+            $selected_keys = self::get_default_feature_keys();
+        }
+
+        return array_values(array_filter($selected_keys, static function ($key) use ($catalog) {
+            return isset($catalog[$key]);
+        }));
+    }
+
+    public static function get_selected_features(int $course_id): array
+    {
+        $selected_keys = self::get_selected_feature_keys($course_id);
+        $catalog = self::get_feature_catalog();
+        $selected = [];
+
+        foreach ($catalog as $key => $feature) {
+            if (!in_array($key, $selected_keys, true)) {
+                continue;
+            }
+
+            $selected[] = [
+                'key'   => $key,
+                'label' => (string) ($feature['label'] ?? ''),
+                'icon'  => (string) ($feature['icon'] ?? 'fa-light fa-check'),
+            ];
+        }
+
+        return $selected;
     }
 
 
@@ -117,6 +240,34 @@ class PRESS_LMS_Course_Meta
         echo '</div>';
     }
 
+    private static function render_features_section($post): void
+    {
+        $selected_keys = self::get_selected_feature_keys((int) $post->ID);
+        $catalog = self::get_feature_catalog();
+
+        echo '<div class="press-course-tab__section">';
+        echo '<h3>O que o curso inclui</h3>';
+        echo '<p style="margin-top:0;color:#646970;">Marque os benefícios que devem aparecer na lateral da página do curso no frontend.</p>';
+        echo '<div class="press-course-features-grid">';
+
+        foreach ($catalog as $key => $feature) {
+            $checked = in_array($key, $selected_keys, true);
+            $admin_icon = !empty($feature['admin_icon']) ? (string) $feature['admin_icon'] : 'dashicons dashicons-yes-alt';
+
+            echo '<label class="press-course-feature">';
+            echo '<input type="checkbox" name="press_course_features[]" value="' . esc_attr($key) . '" ' . checked($checked, true, false) . '>';
+            echo '<span class="press-course-feature__icon"><span class="' . esc_attr($admin_icon) . '" aria-hidden="true"></span></span>';
+            echo '<span class="press-course-feature__content">';
+            echo '<strong>' . esc_html($feature['label']) . '</strong>';
+            echo '<small>Exibir este item na sidebar do curso.</small>';
+            echo '</span>';
+            echo '</label>';
+        }
+
+        echo '</div>';
+        echo '</div>';
+    }
+
     public static function render($post)
     {
         wp_nonce_field('press_course_meta_save', 'press_course_meta_nonce');
@@ -124,6 +275,7 @@ class PRESS_LMS_Course_Meta
         $trailer    = get_post_meta($post->ID, '_press_course_trailer', true);
         $product_id = (int) get_post_meta($post->ID, '_press_course_product_id', true);
         $price      = get_post_meta($post->ID, '_press_course_price', true);
+        $is_paused  = get_post_meta($post->ID, '_press_course_paused', true) === 'yes';
 
         // Carrega todos os professores cadastrados
         $teachers = get_posts([
@@ -141,6 +293,8 @@ class PRESS_LMS_Course_Meta
         $certificate_logo_url = $certificate_logo_id ? wp_get_attachment_url($certificate_logo_id) : '';
         $certificate_sign_url = $certificate_sign_id ? wp_get_attachment_url($certificate_sign_id) : '';
         $lessons_count = count(self::get_course_lessons((int) $post->ID));
+        $selected_features = self::get_selected_features((int) $post->ID);
+        $features_count = count($selected_features);
 
         $certificate_html = (string) get_post_meta($post->ID, '_press_course_certificate_html', true);
 
@@ -214,8 +368,51 @@ class PRESS_LMS_Course_Meta
                 grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 16px;
             }
+            .press-course-features-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+            }
+            .press-course-feature {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 14px;
+                border: 1px solid #dcdcde;
+                border-radius: 12px;
+                background: #fff;
+            }
+            .press-course-feature input {
+                margin-top: 2px;
+            }
+            .press-course-feature__icon {
+                width: 36px;
+                height: 36px;
+                flex: 0 0 36px;
+                display: grid;
+                place-items: center;
+                border-radius: 10px;
+                background: #f0f6fc;
+                color: #2271b1;
+                border: 1px solid #d0e3f2;
+            }
+            .press-course-feature__icon .dashicons {
+                width: 18px;
+                height: 18px;
+                font-size: 18px;
+            }
+            .press-course-feature__content {
+                display: grid;
+                gap: 3px;
+            }
+            .press-course-feature__content small {
+                color: #646970;
+            }
             @media (max-width: 960px) {
                 .press-course-tab__grid {
+                    grid-template-columns: 1fr;
+                }
+                .press-course-features-grid {
                     grid-template-columns: 1fr;
                 }
             }
@@ -224,6 +421,7 @@ class PRESS_LMS_Course_Meta
         echo '<div class="press-course-tabs" id="press-course-tabs">';
         echo '<div class="press-course-tabs__nav" role="tablist" aria-label="Seções do curso">';
         echo '<button type="button" class="press-course-tabs__btn is-active" data-tab-target="details" role="tab" aria-selected="true">Detalhes</button>';
+        echo '<button type="button" class="press-course-tabs__btn" data-tab-target="includes" role="tab" aria-selected="false">Inclui <span class="press-course-tabs__count">' . esc_html($features_count) . '</span></button>';
         echo '<button type="button" class="press-course-tabs__btn" data-tab-target="certificate" role="tab" aria-selected="false">Certificado</button>';
         echo '<button type="button" class="press-course-tabs__btn" data-tab-target="lessons" role="tab" aria-selected="false">Aulas <span class="press-course-tabs__count">' . esc_html($lessons_count) . '</span></button>';
         echo '</div>';
@@ -268,7 +466,18 @@ class PRESS_LMS_Course_Meta
             echo '<option value="' . esc_attr($teacher->ID) . '"' . $selected . '>' . esc_html($teacher->post_title) . '</option>';
         }
         echo '</select></p>';
+
+        echo '<hr>';
+        echo '<input type="hidden" name="press_course_paused" value="no">';
+        echo '<label style="display:flex;align-items:flex-start;gap:10px;">';
+        echo '<input type="checkbox" name="press_course_paused" value="yes" ' . checked($is_paused, true, false) . '>';
+        echo '<span><strong>Curso pausado</strong><br><span style="color:#646970;">Quando pausado, o curso continua acessível para quem já está matriculado, mas bloqueia novas matrículas e oculta o produto da vitrine do WooCommerce.</span></span>';
+        echo '</label>';
         echo '</div>';
+        echo '</div>';
+
+        echo '<div class="press-course-tab" data-tab-panel="includes">';
+        self::render_features_section($post);
         echo '</div>';
 
         echo '<div class="press-course-tab" data-tab-panel="certificate">';
@@ -455,6 +664,26 @@ class PRESS_LMS_Course_Meta
         }
         if (isset($_POST['press_course_teacher'])) {
             update_post_meta($post_id, '_press_course_teacher', (int) $_POST['press_course_teacher']);
+        }
+        $feature_catalog = self::get_feature_catalog();
+        $submitted_features = isset($_POST['press_course_features']) && is_array($_POST['press_course_features'])
+            ? array_map('sanitize_key', wp_unslash($_POST['press_course_features']))
+            : [];
+        $submitted_features = array_values(array_filter($submitted_features, static function ($key) use ($feature_catalog) {
+            return isset($feature_catalog[$key]);
+        }));
+        update_post_meta($post_id, self::META_FEATURES, $submitted_features);
+
+        if (isset($_POST['press_course_paused'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_paused',
+                $_POST['press_course_paused'] === 'yes' ? 'yes' : 'no'
+            );
+
+            if (class_exists('PRESS_LMS_Woo') && method_exists('PRESS_LMS_Woo', 'sync_course_product_state')) {
+                PRESS_LMS_Woo::sync_course_product_state((int) $post_id);
+            }
         }
         // ❌ Removido: salvar product_id manualmente
         // Isso agora é responsabilidade do PRESS_LMS_Woo (criação automática).

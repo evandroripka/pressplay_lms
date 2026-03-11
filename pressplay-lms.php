@@ -47,5 +47,6 @@ require_once PRESS_LMS_PATH . 'includes/Duration.php';
 require_once PRESS_LMS_PATH . 'includes/Metabox_Teacher.php';
 require_once PRESS_LMS_PATH . 'includes/Progress.php';
 require_once PRESS_LMS_PATH . 'includes/Certificate.php';
+require_once PRESS_LMS_PATH . 'includes/Course_Lifecycle.php';
 
 PRESS_LMS_Plugin::register();

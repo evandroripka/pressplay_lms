@@ -14,6 +14,7 @@ class PRESS_LMS_Woo
         // ativa matrícula quando pedido for pago/processado
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_completed'], 10, 1);
         add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);
+        add_filter('woocommerce_is_purchasable', [__CLASS__, 'filter_is_purchasable'], 10, 2);
     }
 
     /**
@@ -33,6 +34,7 @@ class PRESS_LMS_Woo
 
         $course_id = self::get_course_id_from_product_id((int)$product_id);
         if ($course_id <= 0) return;
+        if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) return;
 
         PRESS_LMS_Enrollments::get_or_create_pending($user_id, $course_id, 'woocommerce');
     }
@@ -62,6 +64,9 @@ class PRESS_LMS_Woo
             $course_id = self::get_course_id_from_product_id($product_id);
 
             if ($course_id > 0) {
+                if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
+                    continue;
+                }
                 PRESS_LMS_Enrollments::get_or_create_pending($user_id, $course_id, 'woocommerce');
             }
         }
@@ -88,6 +93,9 @@ class PRESS_LMS_Woo
             $course_id = self::get_course_id_from_product_id($product_id);
 
             if ($course_id > 0) {
+                if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
+                    continue;
+                }
                 PRESS_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int)$order_id, 'woocommerce');
             }
         }
@@ -142,6 +150,12 @@ class PRESS_LMS_Woo
         $existing_product_id = (int) get_post_meta($post_id, '_press_course_product_id', true);
         $price = get_post_meta($post_id, '_press_course_price', true);
         $price = $price !== '' ? $price : '0';
+        $is_paused = class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused((int) $post_id);
+
+        if ($is_paused) {
+            self::sync_course_product_state((int) $post_id);
+            return;
+        }
 
         // Se não tem preço ainda, não cria
         if ((float)$price <= 0) return;
@@ -199,6 +213,8 @@ class PRESS_LMS_Woo
         if (!$product) return;
 
         $product->set_name($course_post->post_title);
+        $product->set_status('publish');
+        $product->set_catalog_visibility('visible');
         $product->set_regular_price($price);
 
         $thumb_id = get_post_thumbnail_id($course_id);
@@ -208,5 +224,46 @@ class PRESS_LMS_Woo
 
         $product->update_meta_data('_press_course_id', $course_id);
         $product->save();
+    }
+
+    public static function sync_course_product_state(int $course_id): void
+    {
+        if (!self::woo_active()) return;
+
+        $product_id = (int) get_post_meta($course_id, '_press_course_product_id', true);
+        if ($product_id <= 0) return;
+
+        $product = wc_get_product($product_id);
+        if (!$product) return;
+
+        $is_paused = class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id);
+
+        if ($is_paused) {
+            $product->set_catalog_visibility('hidden');
+            $product->set_status('draft');
+        } else {
+            $product->set_catalog_visibility('visible');
+            $product->set_status('publish');
+        }
+
+        $product->save();
+    }
+
+    public static function filter_is_purchasable($is_purchasable, $product)
+    {
+        if (!$is_purchasable || !$product instanceof WC_Product) {
+            return $is_purchasable;
+        }
+
+        $course_id = self::get_course_id_from_product_id((int) $product->get_id());
+        if ($course_id <= 0) {
+            return $is_purchasable;
+        }
+
+        if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
+            return false;
+        }
+
+        return $is_purchasable;
     }
 }

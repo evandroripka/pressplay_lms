@@ -28,6 +28,7 @@ class PRESS_LMS_Plugin
         PRESS_LMS_Woo::init();
         PRESS_LMS_Templates::init();
         PRESS_LMS_Actions::init();
+        PRESS_LMS_Course_Lifecycle::init();
         PRESS_LMS_Teacher_Meta::init();
 
         if (class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'init')) {
