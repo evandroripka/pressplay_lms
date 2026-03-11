@@ -132,8 +132,7 @@ class PRESS_LMS_Course_Meta
         return $selected;
     }
 
-
-    private static function get_default_certificate_html(): string
+    private static function get_legacy_default_certificate_html(): string
     {
         return '
 <div class="presslms-cert">
@@ -166,6 +165,90 @@ class PRESS_LMS_Course_Meta
       <img src="{{signature_url}}" alt="Assinatura">
       <div class="presslms-cert__line"></div>
       <div class="presslms-cert__label">Assinatura</div>
+    </div>
+  </div>
+</div>';
+    }
+
+    private static function normalize_certificate_template_html(string $html): string
+    {
+        $html = trim($html);
+        $html = preg_replace('/\s+/', ' ', $html);
+        return is_string($html) ? trim($html) : '';
+    }
+
+    public static function is_legacy_default_certificate_html(string $html): bool
+    {
+        $html = self::normalize_certificate_template_html($html);
+        if ($html === '') {
+            return false;
+        }
+
+        return $html === self::normalize_certificate_template_html(self::get_legacy_default_certificate_html());
+    }
+
+    public static function get_default_certificate_html(): string
+    {
+        $template = PRESS_LMS_PATH . 'templates/certificado/certificado.php';
+
+        if (file_exists($template)) {
+            $contents = (string) file_get_contents($template);
+            if (trim($contents) !== '') {
+                return $contents;
+            }
+        }
+
+        return '
+<div class="presslms-cert">
+  <div class="presslms-cert__topbar"></div>
+
+  <div class="presslms-cert__inner">
+    <div class="presslms-cert__logo">
+      <img src="{{logo_url}}" alt="Logo">
+    </div>
+
+    <div style="text-align:center;">
+      <div class="presslms-cert__badge">Certificado Oficial</div>
+    </div>
+
+    <h1 class="presslms-cert__title">Certificado de Conclusão</h1>
+    <p class="presslms-cert__subtitle">Certificamos que</p>
+
+    <div class="presslms-cert__student">{{student_name}}</div>
+
+    <div class="presslms-cert__text">
+      concluiu com êxito o curso online
+    </div>
+
+    <div class="presslms-cert__course">{{course_name}}</div>
+
+    <div class="presslms-cert__description">
+      {{certificate_description}}
+    </div>
+
+    <div class="presslms-cert__meta-grid">
+      <div class="presslms-cert__meta-card">
+        <div class="presslms-cert__meta-label">Duração do curso</div>
+        <div class="presslms-cert__meta-value">{{course_duration}}</div>
+      </div>
+
+      <div class="presslms-cert__meta-card">
+        <div class="presslms-cert__meta-label">Data de conclusão</div>
+        <div class="presslms-cert__meta-value">{{completion_date}}</div>
+      </div>
+    </div>
+
+    <div class="presslms-cert__footer">
+      <div class="presslms-cert__signature-block">
+        <img src="{{signature_url}}" alt="Assinatura">
+        <div class="presslms-cert__line"></div>
+        <div class="presslms-cert__label">Assinatura autorizada</div>
+      </div>
+
+      <div class="presslms-cert__seal">
+        Verificado
+        <strong>LMS</strong>
+      </div>
     </div>
   </div>
 </div>';
@@ -276,6 +359,15 @@ class PRESS_LMS_Course_Meta
         $product_id = (int) get_post_meta($post->ID, '_press_course_product_id', true);
         $price      = get_post_meta($post->ID, '_press_course_price', true);
         $is_paused  = get_post_meta($post->ID, '_press_course_paused', true) === 'yes';
+        $access_settings = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::get_course_access_settings((int) $post->ID)
+            : ['type' => 'years', 'value' => 1];
+        $access_type = (string) ($access_settings['type'] ?? 'years');
+        $access_value = (int) ($access_settings['value'] ?? 1);
+        $access_value_input = $access_type === 'lifetime' ? 1 : max(1, $access_value);
+        $access_summary = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::format_access_settings($access_settings)
+            : '1 ano de acesso';
 
         // Load all published teachers for the course owner selector.
         $teachers = get_posts([
@@ -298,7 +390,7 @@ class PRESS_LMS_Course_Meta
 
         $certificate_html = (string) get_post_meta($post->ID, '_press_course_certificate_html', true);
 
-        if ($certificate_html === '') {
+        if ($certificate_html === '' || self::is_legacy_default_certificate_html($certificate_html)) {
             $certificate_html = self::get_default_certificate_html();
         }
 
@@ -408,6 +500,15 @@ class PRESS_LMS_Course_Meta
             .press-course-feature__content small {
                 color: #646970;
             }
+            .press-course-access-config {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .press-course-access-config input[type="number"] {
+                width: 90px;
+            }
             @media (max-width: 960px) {
                 .press-course-tab__grid {
                     grid-template-columns: 1fr;
@@ -434,6 +535,22 @@ class PRESS_LMS_Course_Meta
         echo '<p><label><strong>Valor do curso (R$)</strong></label><br>';
         echo '<input type="text" name="press_course_price" value="' . esc_attr($price) . '" class="small-text" placeholder="99,90"> ';
         echo '<span style="color:#666">Ao publicar o curso, o produto WooCommerce será criado/atualizado automaticamente.</span></p>';
+
+        echo '<p><label><strong>Validade do acesso</strong></label><br>';
+        echo '<span class="press-course-access-config">';
+        echo '<span>Libera acesso por</span>';
+        echo '<input type="number" min="1" step="1" name="press_course_access_value" id="press_course_access_value" value="' . esc_attr((string) $access_value_input) . '" class="small-text">';
+        echo '<select name="press_course_access_type" id="press_course_access_type">';
+        if (class_exists('PRESS_LMS_Enrollments')) {
+            foreach (PRESS_LMS_Enrollments::get_supported_access_types() as $type_key => $type_label) {
+                echo '<option value="' . esc_attr($type_key) . '"' . selected($access_type, $type_key, false) . '>' . esc_html($type_label) . '</option>';
+            }
+        } else {
+            echo '<option value="years" selected>Anos</option>';
+        }
+        echo '</select>';
+        echo '</span>';
+        echo '<br><span id="press_course_access_help" style="color:#666">Configuração atual: ' . esc_html($access_summary) . '.</span></p>';
 
         echo '<p><label><strong>Trailer (YouTube/Vimeo URL)</strong></label><br>';
         echo '<input type="url" name="press_course_trailer" value="' . esc_attr($trailer) . '" class="widefat" placeholder="https://vimeo.com/... ou https://youtu.be/..."></p>';
@@ -603,6 +720,31 @@ class PRESS_LMS_Course_Meta
                     frame.open();
                 }
 
+                function updateAccessDurationField() {
+                    const type = $('#press_course_access_type').val();
+                    const $valueField = $('#press_course_access_value');
+                    const $help = $('#press_course_access_help');
+
+                    if (type === 'lifetime') {
+                        $valueField.prop('disabled', true);
+                        $help.text('Configuração atual: acesso vitalício. O aluno não perde acesso após a compra.');
+                        return;
+                    }
+
+                    $valueField.prop('disabled', false);
+
+                    const rawValue = parseInt($valueField.val(), 10);
+                    const value = Number.isFinite(rawValue) && rawValue > 0 ? rawValue : 1;
+                    const unitMap = {
+                        days: value === 1 ? 'dia' : 'dias',
+                        months: value === 1 ? 'mês' : 'meses',
+                        years: value === 1 ? 'ano' : 'anos'
+                    };
+                    const unit = unitMap[type] || 'dias';
+
+                    $help.text('Configuração atual: ' + value + ' ' + unit + ' de acesso.');
+                }
+
                 $('#press_pick_certificate_logo').on('click', function(e) {
                     e.preventDefault();
                     openMedia('press_course_certificate_logo_id', 'press_course_certificate_logo_url', 'Selecionar logo do certificado');
@@ -624,6 +766,10 @@ class PRESS_LMS_Course_Meta
                     $('#press_course_certificate_signature_id').val('');
                     $('#press_course_certificate_signature_url').val('');
                 });
+
+                $('#press_course_access_type').on('change', updateAccessDurationField);
+                $('#press_course_access_value').on('input', updateAccessDurationField);
+                updateAccessDurationField();
             })(jQuery);
         </script>
 <?php
@@ -664,6 +810,16 @@ class PRESS_LMS_Course_Meta
         }
         if (isset($_POST['press_course_teacher'])) {
             update_post_meta($post_id, '_press_course_teacher', (int) $_POST['press_course_teacher']);
+        }
+        if (isset($_POST['press_course_access_type'])) {
+            $access_type = sanitize_key((string) wp_unslash($_POST['press_course_access_type']));
+            $access_value = isset($_POST['press_course_access_value']) ? (int) $_POST['press_course_access_value'] : 1;
+
+            if (class_exists('PRESS_LMS_Enrollments') && method_exists('PRESS_LMS_Enrollments', 'normalize_access_settings')) {
+                $settings = PRESS_LMS_Enrollments::normalize_access_settings($access_type, $access_value);
+                update_post_meta($post_id, '_press_course_access_type', (string) $settings['type']);
+                update_post_meta($post_id, '_press_course_access_value', (int) $settings['value']);
+            }
         }
         $feature_catalog = self::get_feature_catalog();
         $submitted_features = isset($_POST['press_course_features']) && is_array($_POST['press_course_features'])

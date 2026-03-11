@@ -7,6 +7,7 @@ $course_slug = (string) ($course_slug_var ?? '');
 $can_access  = (bool) ($can_access_var ?? false);
 
 $trailer     = (string) ($trailer_var ?? '');
+$course_access_label = (string) ($course_access_label_var ?? '');
 $lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 $course_thumbnail_url = get_the_post_thumbnail_url($course->ID, 'medium_large') ?: '';
 $course_duration_seconds = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
@@ -79,6 +80,12 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
             <span class="presslms-chip">
               <i class="fa-light fa-clock"></i>
               <b><?php echo esc_html($course_duration_label); ?></b> de conteúdo
+            </span>
+          <?php endif; ?>
+          <?php if ($course_access_label !== ''): ?>
+            <span class="presslms-chip">
+              <i class="fa-light fa-calendar"></i>
+              <b><?php echo esc_html($course_access_label); ?></b>
             </span>
           <?php endif; ?>
         </div>

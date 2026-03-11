@@ -22,6 +22,10 @@ class PRESS_LMS_Activator
             PRESS_LMS_Rewrite::add_rules();
         }
 
+        if (class_exists('PRESS_LMS_Woo') && method_exists('PRESS_LMS_Woo', 'register_account_endpoint')) {
+            PRESS_LMS_Woo::register_account_endpoint();
+        }
+
         // Enable public registration for the student flow.
         update_option('users_can_register', 1);
 
@@ -56,5 +60,9 @@ class PRESS_LMS_Activator
 
         // Refresh rewrite rules once activation is complete.
         flush_rewrite_rules();
+
+        if (class_exists('PRESS_LMS_Rewrite') && method_exists('PRESS_LMS_Rewrite', 'get_schema_version')) {
+            update_option('press_lms_rewrite_schema_version', PRESS_LMS_Rewrite::get_schema_version(), false);
+        }
     }
 }

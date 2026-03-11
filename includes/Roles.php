@@ -24,7 +24,10 @@ class PRESS_LMS_Roles {
             }
 
             if (is_admin() && !wp_doing_ajax()) {
-                wp_safe_redirect(home_url('/meus-cursos'));
+                $redirect_url = class_exists('PRESS_LMS_Frontend') && method_exists('PRESS_LMS_Frontend', 'get_student_area_url')
+                    ? PRESS_LMS_Frontend::get_student_area_url('courses')
+                    : home_url('/meus-cursos/');
+                wp_safe_redirect($redirect_url);
                 exit;
             }
         }

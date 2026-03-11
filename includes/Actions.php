@@ -180,8 +180,12 @@ class PRESS_LMS_Actions
         ]);
     }
 
-    private static function get_student_dashboard_url(array $args = []): string
+    private static function get_student_dashboard_url(string $screen = 'courses', array $args = []): string
     {
+        if (class_exists('PRESS_LMS_Frontend') && method_exists('PRESS_LMS_Frontend', 'get_student_area_url')) {
+            return PRESS_LMS_Frontend::get_student_area_url($screen, $args);
+        }
+
         $base_url = home_url('/meus-cursos/');
         return !empty($args) ? add_query_arg($args, $base_url) : $base_url;
     }
@@ -189,19 +193,27 @@ class PRESS_LMS_Actions
     public static function handle_account_password_update()
     {
         if (!is_user_logged_in()) {
-            wp_safe_redirect(self::get_student_dashboard_url());
+            wp_safe_redirect(self::get_student_dashboard_url('courses'));
             exit;
         }
 
         $user_id = get_current_user_id();
-        $redirect_tab = isset($_POST['redirect_tab']) ? sanitize_key((string) $_POST['redirect_tab']) : 'profile';
-        $redirect_args = ['tab' => $redirect_tab];
+        $redirect_screen = isset($_POST['redirect_screen'])
+            ? sanitize_key((string) $_POST['redirect_screen'])
+            : (isset($_POST['redirect_tab']) ? sanitize_key((string) $_POST['redirect_tab']) : 'password');
+        $redirect_map = [
+            'courses' => 'courses',
+            'certificates' => 'certificates',
+            'profile' => 'profile',
+            'password' => 'password',
+        ];
+        $redirect_screen = $redirect_map[$redirect_screen] ?? 'password';
 
         if (
             !isset($_POST['press_lms_account_password_nonce']) ||
             !wp_verify_nonce($_POST['press_lms_account_password_nonce'], 'press_lms_update_account_password')
         ) {
-            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_nonce_invalid']));
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_nonce_invalid']));
             exit;
         }
 
@@ -211,22 +223,22 @@ class PRESS_LMS_Actions
 
         $user = get_userdata($user_id);
         if (!$user) {
-            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_user_invalid']));
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_user_invalid']));
             exit;
         }
 
         if ($current_password === '' || !wp_check_password($current_password, $user->user_pass, $user_id)) {
-            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_current_invalid']));
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_current_invalid']));
             exit;
         }
 
         if (strlen(trim($new_password)) < 6) {
-            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_too_short']));
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_too_short']));
             exit;
         }
 
         if ($new_password !== $confirm_password) {
-            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_mismatch']));
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_mismatch']));
             exit;
         }
 
@@ -234,7 +246,7 @@ class PRESS_LMS_Actions
         wp_set_current_user($user_id);
         wp_set_auth_cookie($user_id, true);
 
-        wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_updated']));
+        wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_updated']));
         exit;
     }
     /**
@@ -424,7 +436,7 @@ class PRESS_LMS_Actions
 
         $roles = (array) $user->roles;
         if (in_array('press_student', $roles, true)) {
-            return home_url('/meus-cursos/');
+            return self::get_student_dashboard_url('courses');
         }
 
         if (
@@ -432,7 +444,7 @@ class PRESS_LMS_Actions
             method_exists('PRESS_LMS_Enrollments', 'get_active_enrollments') &&
             !empty(PRESS_LMS_Enrollments::get_active_enrollments((int) $user->ID))
         ) {
-            return home_url('/meus-cursos/');
+            return self::get_student_dashboard_url('courses');
         }
 
         return $fallback;

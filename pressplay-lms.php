@@ -30,6 +30,7 @@ require_once PRESS_LMS_PATH . 'includes/Database.php';
 require_once PRESS_LMS_PATH . 'includes/Roles.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Rewrite.php';
 require_once PRESS_LMS_PATH . 'includes/Frontend.php';
+require_once PRESS_LMS_PATH . 'includes/Menu.php';
 require_once PRESS_LMS_PATH . 'includes/Mailer.php';
 require_once PRESS_LMS_PATH . 'includes/Settings.php';
 require_once PRESS_LMS_PATH . 'includes/Support/Helpers.php';

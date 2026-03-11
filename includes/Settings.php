@@ -207,6 +207,7 @@ class PRESS_LMS_Settings
         $filter_status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
         $filter_search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
         $filter_sort   = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'date_desc';
+        $now = current_time('mysql');
 
         $where = [];
         $params = [];
@@ -218,7 +219,15 @@ class PRESS_LMS_Settings
             $params[] = $filter_course;
         }
 
-        if ($filter_status !== '') {
+        if ($filter_status === 'active') {
+            $where[] = "e.status = %s AND (e.expires_at IS NULL OR e.expires_at > %s)";
+            $params[] = 'active';
+            $params[] = $now;
+        } elseif ($filter_status === 'expired') {
+            $where[] = "e.status = %s AND e.expires_at IS NOT NULL AND e.expires_at <= %s";
+            $params[] = 'active';
+            $params[] = $now;
+        } elseif ($filter_status !== '') {
             $where[] = "e.status = %s";
             $params[] = $filter_status;
         }

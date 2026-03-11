@@ -57,6 +57,10 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
           <i class="fa-light fa-user-gear"></i>
           Meu perfil
         </a>
+        <a class="presslms-btn" href="<?php echo esc_url($urls['password'] ?? '#'); ?>">
+          <i class="fa-light fa-key"></i>
+          Trocar senha
+        </a>
         <a class="presslms-btn" href="<?php echo esc_url($urls['logout'] ?? '#'); ?>">
           <i class="fa-light fa-arrow-right-from-bracket"></i>
           Sair
@@ -96,6 +100,10 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
     </section>
 
     <nav class="presslms-student-nav" aria-label="Navegação da área do aluno">
+      <a class="presslms-student-nav__link<?php echo $active_tab === 'catalog' ? ' is-active' : ''; ?>" href="<?php echo esc_url($urls['catalog'] ?? '#'); ?>">
+        <i class="fa-light fa-store"></i>
+        Showroom
+      </a>
       <a class="presslms-student-nav__link<?php echo $active_tab === 'courses' ? ' is-active' : ''; ?>" href="<?php echo esc_url($urls['courses'] ?? '#'); ?>">
         <i class="fa-light fa-graduation-cap"></i>
         Meus cursos
@@ -107,6 +115,10 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
       <a class="presslms-student-nav__link<?php echo $active_tab === 'profile' ? ' is-active' : ''; ?>" href="<?php echo esc_url($urls['profile'] ?? '#'); ?>">
         <i class="fa-light fa-user-pen"></i>
         Perfil
+      </a>
+      <a class="presslms-student-nav__link<?php echo $active_tab === 'password' ? ' is-active' : ''; ?>" href="<?php echo esc_url($urls['password'] ?? '#'); ?>">
+        <i class="fa-light fa-key"></i>
+        Trocar senha
       </a>
     </nav>
 
@@ -159,6 +171,9 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
                   <span><i class="fa-light fa-layer-group"></i> <?php echo esc_html((string) $course['total_lessons']); ?> aulas</span>
                   <?php if (!empty($course['duration_label'])): ?>
                     <span><i class="fa-light fa-clock"></i> <?php echo esc_html((string) $course['duration_label']); ?></span>
+                  <?php endif; ?>
+                  <?php if (!empty($course['access_expires_label'])): ?>
+                    <span><i class="fa-light fa-calendar"></i> <?php echo esc_html((string) $course['access_expires_label']); ?></span>
                   <?php endif; ?>
                 </div>
 
@@ -231,7 +246,7 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
           <?php endforeach; ?>
         </section>
       <?php endif; ?>
-    <?php else: ?>
+    <?php elseif ($active_tab === 'profile'): ?>
       <section class="presslms-student-profile-grid">
         <article class="presslms-card presslms-student-profile-card">
           <div class="presslms-card__header">
@@ -259,11 +274,24 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
 
         <article class="presslms-card presslms-student-profile-card">
           <div class="presslms-card__header">
+            <h2 class="presslms-h2"><i class="fa-light fa-shield-keyhole"></i> Segurança da conta</h2>
+          </div>
+          <p class="presslms-muted">Gerencie sua senha em uma tela dedicada para manter o acesso à área do aluno e aos seus certificados.</p>
+          <a class="presslms-btn presslms-btn--primary" href="<?php echo esc_url($urls['password'] ?? '#'); ?>">
+            <i class="fa-light fa-key"></i>
+            Ir para trocar senha
+          </a>
+        </article>
+      </section>
+    <?php elseif ($active_tab === 'password'): ?>
+      <section class="presslms-student-profile-grid">
+        <article class="presslms-card presslms-student-profile-card">
+          <div class="presslms-card__header">
             <h2 class="presslms-h2"><i class="fa-light fa-key"></i> Alterar senha</h2>
           </div>
           <form class="presslms-student-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <input type="hidden" name="action" value="press_lms_update_account_password">
-            <input type="hidden" name="redirect_tab" value="profile">
+            <input type="hidden" name="redirect_screen" value="password">
             <?php wp_nonce_field('press_lms_update_account_password', 'press_lms_account_password_nonce'); ?>
 
             <label class="presslms-student-form__label" for="presslms-current-password">Senha atual</label>
@@ -283,6 +311,35 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
             </button>
           </form>
         </article>
+
+        <article class="presslms-card presslms-student-profile-card">
+          <div class="presslms-card__header">
+            <h2 class="presslms-h2"><i class="fa-light fa-id-card"></i> Dados da conta</h2>
+          </div>
+          <dl class="presslms-student-detail-list">
+            <div>
+              <dt>Nome</dt>
+              <dd><?php echo esc_html($display_name); ?></dd>
+            </div>
+            <div>
+              <dt>E-mail</dt>
+              <dd><?php echo esc_html($email); ?></dd>
+            </div>
+            <div>
+              <dt>Telefone</dt>
+              <dd><?php echo $phone !== '' ? esc_html($phone) : 'Não informado'; ?></dd>
+            </div>
+          </dl>
+          <a class="presslms-btn" href="<?php echo esc_url($urls['profile'] ?? '#'); ?>">
+            <i class="fa-light fa-user-pen"></i>
+            Voltar para meu perfil
+          </a>
+        </article>
+      </section>
+    <?php else: ?>
+      <section class="presslms-card presslms-student-empty">
+        <h2 class="presslms-h2"><i class="fa-light fa-circle-exclamation"></i> Área do aluno não encontrada</h2>
+        <p class="presslms-muted">Use a navegação acima para acessar seus cursos, certificados ou dados da conta.</p>
       </section>
     <?php endif; ?>
   </div>

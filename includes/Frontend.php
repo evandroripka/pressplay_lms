@@ -38,7 +38,7 @@ class PRESS_LMS_Frontend
     public static function shortcode_register()
     {
         if (is_user_logged_in()) {
-            return '<div class="press-alert press-alert--info">Você já está logado. <a class="press-link" href="' . esc_url(home_url('/meus-cursos')) . '">Ir para Meus Cursos</a></div>';
+            return '<div class="press-alert press-alert--info">Você já está logado. <a class="press-link" href="' . esc_url(self::get_student_area_url('courses')) . '">Ir para Meus Cursos</a></div>';
         }
 
         $errors = [];
@@ -113,17 +113,155 @@ class PRESS_LMS_Frontend
         return ob_get_clean();
     }
 
+    public static function get_student_area_definitions(): array
+    {
+        $areas = [
+            'catalog' => [
+                'label' => 'Showroom de cursos',
+                'path' => '/cursos/',
+                'page_title' => 'Cursos - Pressplay',
+                'menu' => true,
+                'student_nav' => true,
+            ],
+            'courses' => [
+                'label' => 'Meus cursos',
+                'path' => '/meus-cursos/',
+                'page_title' => 'Meus cursos - Pressplay',
+                'menu' => true,
+                'student_nav' => true,
+            ],
+            'certificates' => [
+                'label' => 'Certificados',
+                'path' => '/meus-cursos/certificados/',
+                'page_title' => 'Certificados - Pressplay',
+                'menu' => true,
+                'student_nav' => true,
+            ],
+            'profile' => [
+                'label' => 'Meu perfil',
+                'path' => '/meus-cursos/perfil/',
+                'page_title' => 'Meu perfil - Pressplay',
+                'menu' => true,
+                'student_nav' => true,
+            ],
+            'password' => [
+                'label' => 'Trocar senha',
+                'path' => '/meus-cursos/trocar-senha/',
+                'page_title' => 'Trocar senha - Pressplay',
+                'menu' => true,
+                'student_nav' => true,
+            ],
+        ];
+
+        return apply_filters('press_lms_student_area_definitions', $areas);
+    }
+
+    public static function get_student_area_url(string $area = 'courses', array $args = []): string
+    {
+        $areas = self::get_student_area_definitions();
+
+        if (!isset($areas[$area])) {
+            $area = 'courses';
+        }
+
+        $url = home_url((string) $areas[$area]['path']);
+
+        return !empty($args) ? add_query_arg($args, $url) : $url;
+    }
+
+    public static function get_student_menu_items(): array
+    {
+        $items = [];
+
+        foreach (self::get_student_area_definitions() as $key => $definition) {
+            if (empty($definition['menu'])) {
+                continue;
+            }
+
+            $items[$key] = [
+                'key' => $key,
+                'label' => (string) ($definition['label'] ?? $key),
+                'url' => self::get_student_area_url($key),
+                'student_nav' => !empty($definition['student_nav']),
+            ];
+        }
+
+        return $items;
+    }
+
+    public static function resolve_student_area_from_path(string $path): string
+    {
+        $path = trim($path, '/');
+
+        if ($path === '') {
+            return '';
+        }
+
+        if (preg_match('#^cursos/?$#', $path)) {
+            return 'catalog';
+        }
+
+        if (preg_match('#^meus-cursos/certificado/[^/]+/?$#', $path)) {
+            return 'certificates';
+        }
+
+        if (preg_match('#^meus-cursos/certificados/?$#', $path)) {
+            return 'certificates';
+        }
+
+        if (preg_match('#^meus-cursos/perfil/?$#', $path)) {
+            return 'profile';
+        }
+
+        if (preg_match('#^meus-cursos/trocar-senha/?$#', $path)) {
+            return 'password';
+        }
+
+        if (preg_match('#^meus-cursos/?$#', $path)) {
+            return 'courses';
+        }
+
+        return '';
+    }
+
     private static function get_student_dashboard_tab(): string
     {
-        $tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : 'courses';
-        $allowed = ['courses', 'certificates', 'profile'];
+        $area = sanitize_key((string) get_query_var('press_student_area'));
+        $map = [
+            'courses' => 'courses',
+            'certificates' => 'certificates',
+            'certificados' => 'certificates',
+            'profile' => 'profile',
+            'perfil' => 'profile',
+            'password' => 'password',
+            'trocar-senha' => 'password',
+        ];
 
-        return in_array($tab, $allowed, true) ? $tab : 'courses';
+        if ($area !== '' && isset($map[$area])) {
+            return $map[$area];
+        }
+
+        $tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : 'courses';
+        $legacy_map = [
+            'courses' => 'courses',
+            'certificates' => 'certificates',
+            'profile' => 'profile',
+            'password' => 'password',
+        ];
+
+        return $legacy_map[$tab] ?? 'courses';
+    }
+
+    private static function get_student_area_page_title(string $area): string
+    {
+        $areas = self::get_student_area_definitions();
+
+        return (string) ($areas[$area]['page_title'] ?? 'Área do Aluno - Pressplay');
     }
 
     private static function get_student_login_url(string $redirect_to = ''): string
     {
-        $dashboard_url = $redirect_to !== '' ? $redirect_to : home_url('/meus-cursos/');
+        $dashboard_url = $redirect_to !== '' ? $redirect_to : self::get_student_area_url('courses');
 
         if (class_exists('WooCommerce') && function_exists('wc_get_page_permalink')) {
             $myaccount = wc_get_page_permalink('myaccount');
@@ -137,7 +275,7 @@ class PRESS_LMS_Frontend
 
     private static function get_student_catalog_url(): string
     {
-        return home_url('/cursos/');
+        return self::get_student_area_url('catalog');
     }
 
     private static function get_student_dashboard_notice(?string $notice): ?array
@@ -191,13 +329,7 @@ class PRESS_LMS_Frontend
 
     private static function get_student_certificate_url(WP_Post $course): string
     {
-        return add_query_arg(
-            [
-                'tab' => 'certificates',
-                'certificate' => $course->post_name,
-            ],
-            home_url('/meus-cursos/')
-        );
+        return home_url('/meus-cursos/certificado/' . $course->post_name . '/');
     }
 
     private static function get_course_excerpt(WP_Post $course, int $words = 26): string
@@ -328,6 +460,12 @@ class PRESS_LMS_Frontend
         }
 
         $certificate_url = $is_completed ? self::get_student_certificate_url($course) : '';
+        $course_access_label = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::get_course_access_label($course_id)
+            : '';
+        $access_expires_label = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::format_enrollment_expires_at((string) ($enrollment->expires_at ?? ''))
+            : '';
 
         return [
             'course_id' => $course_id,
@@ -341,6 +479,8 @@ class PRESS_LMS_Frontend
             'expires_at' => !empty($enrollment->expires_at) ? date_i18n('d/m/Y', strtotime((string) $enrollment->expires_at)) : '',
             'duration_seconds' => $course_duration_seconds,
             'duration_label' => $duration_label,
+            'access_label' => $course_access_label,
+            'access_expires_label' => $access_expires_label,
             'progress_percent' => (int) ($progress['percent'] ?? 0),
             'completed_lessons' => (int) ($progress['completed'] ?? 0),
             'total_lessons' => (int) ($progress['total'] ?? 0),
@@ -450,6 +590,9 @@ class PRESS_LMS_Frontend
         $duration_label = class_exists('PRESS_LMS_Certificate')
             ? PRESS_LMS_Certificate::format_seconds($course_duration_seconds)
             : '';
+        $access_label = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::get_course_access_label($course_id)
+            : '';
 
         $features = class_exists('PRESS_LMS_Course_Meta')
             ? array_slice(PRESS_LMS_Course_Meta::get_selected_features($course_id), 0, 4)
@@ -478,6 +621,7 @@ class PRESS_LMS_Frontend
             'teacher_name' => $teacher_name,
             'lessons_count' => count($lessons),
             'duration_label' => $duration_label,
+            'access_label' => $access_label,
             'updated_at' => get_the_modified_date('d/m/Y', $course),
             'excerpt' => self::get_course_excerpt($course),
             'features' => $features,
@@ -503,18 +647,16 @@ class PRESS_LMS_Frontend
 
         $course = get_page_by_path($course_slug, OBJECT, 'press_course');
         if (!$course instanceof WP_Post) {
-            wp_safe_redirect(add_query_arg([
-                'tab' => 'certificates',
+            wp_safe_redirect(self::get_student_area_url('certificates', [
                 'notice' => 'certificate_course_invalid',
-            ], home_url('/meus-cursos/')));
+            ]));
             exit;
         }
 
         if (!class_exists('PRESS_LMS_Certificate')) {
-            wp_safe_redirect(add_query_arg([
-                'tab' => 'certificates',
+            wp_safe_redirect(self::get_student_area_url('certificates', [
                 'notice' => 'certificate_unavailable',
-            ], home_url('/meus-cursos/')));
+            ]));
             exit;
         }
 
@@ -526,10 +668,9 @@ class PRESS_LMS_Frontend
                 ? 'certificate_' . ($error_code === 'course_invalid' ? 'course_invalid' : $error_code)
                 : 'certificate_unavailable';
 
-            wp_safe_redirect(add_query_arg([
-                'tab' => 'certificates',
+            wp_safe_redirect(self::get_student_area_url('certificates', [
                 'notice' => $notice,
-            ], home_url('/meus-cursos/')));
+            ]));
             exit;
         }
 
@@ -591,60 +732,18 @@ class PRESS_LMS_Frontend
 
     public static function render_my_courses()
     {
+        $tab = self::get_student_dashboard_tab();
         $certificate_slug = isset($_GET['certificate']) ? sanitize_title((string) $_GET['certificate']) : '';
+
         if ($certificate_slug !== '') {
-            $certificate_url = add_query_arg(
-                [
-                    'tab' => 'certificates',
-                    'certificate' => $certificate_slug,
-                ],
-                home_url('/meus-cursos/')
-            );
-
-            if (!is_user_logged_in()) {
-                wp_safe_redirect(self::get_student_login_url($certificate_url));
-                exit;
-            }
-
-            $course = get_page_by_path($certificate_slug, OBJECT, 'press_course');
-            if (!$course instanceof WP_Post) {
-                wp_safe_redirect(add_query_arg([
-                    'tab' => 'certificates',
-                    'notice' => 'certificate_course_invalid',
-                ], home_url('/meus-cursos/')));
-                exit;
-            }
-
-            if (!class_exists('PRESS_LMS_Certificate')) {
-                wp_safe_redirect(add_query_arg([
-                    'tab' => 'certificates',
-                    'notice' => 'certificate_unavailable',
-                ], home_url('/meus-cursos/')));
-                exit;
-            }
-
-            $validation = PRESS_LMS_Certificate::validate_certificate_access(get_current_user_id(), (int) $course->ID, true);
-
-            if (is_wp_error($validation)) {
-                $error_code = $validation->get_error_code();
-                $notice = in_array($error_code, ['course_invalid', 'certificate_unavailable', 'forbidden'], true)
-                    ? 'certificate_' . ($error_code === 'course_invalid' ? 'course_invalid' : $error_code)
-                    : 'certificate_unavailable';
-
-                wp_safe_redirect(add_query_arg([
-                    'tab' => 'certificates',
-                    'notice' => $notice,
-                ], home_url('/meus-cursos/')));
-                exit;
-            }
-
-            PRESS_LMS_Certificate::render_certificate_for_user((int) $course->ID, get_current_user_id(), true);
+            wp_safe_redirect(home_url('/meus-cursos/certificado/' . $certificate_slug . '/'));
+            exit;
         }
 
-        self::header('Área do Aluno - Pressplay');
+        self::header(self::get_student_area_page_title($tab));
 
         if (!is_user_logged_in()) {
-            $login_url = self::get_student_login_url();
+            $login_url = self::get_student_login_url(self::get_student_area_url($tab));
             $register_url = home_url('/cadastro/');
 
             echo '<div class="presslms presslms-student"><div class="presslms__container">';
@@ -665,11 +764,10 @@ class PRESS_LMS_Frontend
         $user_id = get_current_user_id();
         $profile = self::get_student_profile_data($user_id);
         $dashboard_data = self::get_student_dashboard_data($user_id);
-        $tab = self::get_student_dashboard_tab();
         $notice = self::get_student_dashboard_notice($_GET['notice'] ?? '');
-        $base_url = home_url('/meus-cursos/');
+        $base_url = self::get_student_area_url('courses');
         $logout_url = wp_logout_url($base_url);
-        $catalog_url = self::get_student_catalog_url();
+        $student_urls = self::get_student_menu_items();
 
         $student_profile_var = $profile;
         $student_courses_var = $dashboard_data['courses'];
@@ -679,11 +777,13 @@ class PRESS_LMS_Frontend
         $student_notice_var = $notice;
         $student_urls_var = [
             'base' => $base_url,
-            'courses' => add_query_arg('tab', 'courses', $base_url),
-            'certificates' => add_query_arg('tab', 'certificates', $base_url),
-            'profile' => add_query_arg('tab', 'profile', $base_url),
+            'catalog' => (string) ($student_urls['catalog']['url'] ?? self::get_student_catalog_url()),
+            'courses' => (string) ($student_urls['courses']['url'] ?? self::get_student_area_url('courses')),
+            'certificates' => (string) ($student_urls['certificates']['url'] ?? self::get_student_area_url('certificates')),
+            'profile' => (string) ($student_urls['profile']['url'] ?? self::get_student_area_url('profile')),
+            'password' => (string) ($student_urls['password']['url'] ?? self::get_student_area_url('password')),
             'logout' => $logout_url,
-            'shop' => $catalog_url,
+            'shop' => (string) ($student_urls['catalog']['url'] ?? self::get_student_catalog_url()),
         ];
 
         $template = trailingslashit(PRESS_LMS_PATH) . 'templates/frontend/student-dashboard.php';
@@ -783,6 +883,9 @@ class PRESS_LMS_Frontend
         if (!empty($lessons[0]) && $lessons[0] instanceof WP_Post) {
             $first_lesson_url = home_url('/curso/' . $slug . '/aula/' . $lessons[0]->post_name . '/');
         }
+        $course_access_label = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::get_course_access_label((int) $course->ID)
+            : '';
 
         $course_slug_var      = $slug;
         $course_var           = $course;
@@ -790,6 +893,7 @@ class PRESS_LMS_Frontend
         $trailer_var          = (string) $trailer;
         $first_lesson_url_var = $first_lesson_url;
         $product_id_var       = PRESS_LMS_Enrollments::get_course_product_id((int) $course->ID);
+        $course_access_label_var = $course_access_label;
 
         $template = trailingslashit(PRESS_LMS_PATH) . 'templates/frontend/single-press_course.php';
 

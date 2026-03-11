@@ -3,8 +3,12 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Woo
 {
+    private const ACCOUNT_ENDPOINT = 'area-do-aluno';
+
     public static function init()
     {
+        add_action('init', [__CLASS__, 'register_account_endpoint']);
+        add_action('template_redirect', [__CLASS__, 'maybe_redirect_account_endpoint']);
         // Keep the linked WooCommerce product in sync with the course post.
         add_action('save_post_press_course', [__CLASS__, 'maybe_sync_product'], 20, 2);
         // Create pending enrollments when course products enter the cart.
@@ -19,7 +23,48 @@ class PRESS_LMS_Woo
         add_filter('woocommerce_add_to_cart_validation', [__CLASS__, 'validate_add_to_cart'], 10, 6);
         add_action('woocommerce_before_calculate_totals', [__CLASS__, 'normalize_course_cart_quantities'], 20, 1);
         add_filter('woocommerce_loop_add_to_cart_link', [__CLASS__, 'filter_loop_add_to_cart_link'], 10, 3);
+        add_filter('woocommerce_account_menu_items', [__CLASS__, 'filter_account_menu_items']);
+        add_filter('woocommerce_get_endpoint_url', [__CLASS__, 'filter_account_endpoint_url'], 10, 4);
+        add_action('woocommerce_account_' . self::ACCOUNT_ENDPOINT . '_endpoint', [__CLASS__, 'render_student_account_endpoint']);
         add_action('wp', [__CLASS__, 'maybe_swap_single_product_button']);
+    }
+
+    public static function register_account_endpoint(): void
+    {
+        if (!class_exists('WooCommerce')) {
+            return;
+        }
+
+        add_rewrite_endpoint(self::ACCOUNT_ENDPOINT, EP_ROOT | EP_PAGES);
+    }
+
+    private static function get_student_profile_url(): string
+    {
+        if (class_exists('PRESS_LMS_Frontend') && method_exists('PRESS_LMS_Frontend', 'get_student_area_url')) {
+            return PRESS_LMS_Frontend::get_student_area_url('profile');
+        }
+
+        return home_url('/meus-cursos/perfil/');
+    }
+
+    public static function maybe_redirect_account_endpoint(): void
+    {
+        if (!class_exists('WooCommerce') || !function_exists('wc_get_page_permalink')) {
+            return;
+        }
+
+        $myaccount_url = wc_get_page_permalink('myaccount');
+        if (!$myaccount_url) {
+            return;
+        }
+
+        $request_path = trim((string) wp_parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
+        $endpoint_path = trim((string) wp_parse_url(trailingslashit($myaccount_url) . self::ACCOUNT_ENDPOINT . '/', PHP_URL_PATH), '/');
+
+        if ($request_path !== '' && $endpoint_path !== '' && $request_path === $endpoint_path) {
+            wp_safe_redirect(self::get_student_profile_url());
+            exit;
+        }
     }
 
     /**
@@ -397,5 +442,62 @@ class PRESS_LMS_Woo
         echo '<p class="presslms-product-course-link">';
         echo '<a class="button alt" href="' . esc_url($course_url) . '">Ver curso</a>';
         echo '</p>';
+    }
+
+    public static function filter_account_menu_items(array $items): array
+    {
+        if (!class_exists('WooCommerce')) {
+            return $items;
+        }
+
+        $logout = $items['customer-logout'] ?? null;
+        unset($items['customer-logout']);
+
+        $items[self::ACCOUNT_ENDPOINT] = 'Área do aluno';
+
+        if ($logout !== null) {
+            $items['customer-logout'] = $logout;
+        }
+
+        return $items;
+    }
+
+    public static function filter_account_endpoint_url($url, $endpoint, $value, $permalink): string
+    {
+        if ($endpoint !== self::ACCOUNT_ENDPOINT) {
+            return (string) $url;
+        }
+
+        return self::get_student_profile_url();
+    }
+
+    public static function render_student_account_endpoint(): void
+    {
+        $links = class_exists('PRESS_LMS_Frontend') && method_exists('PRESS_LMS_Frontend', 'get_student_menu_items')
+            ? PRESS_LMS_Frontend::get_student_menu_items()
+            : [];
+
+        echo '<h3>Área do aluno</h3>';
+        echo '<p>Acesse rapidamente o showroom, seus cursos, certificados, perfil e troca de senha.</p>';
+
+        if (empty($links)) {
+            echo '<p>Nenhum atalho da área do aluno foi encontrado.</p>';
+            return;
+        }
+
+        echo '<div class="presslms-woo-student-links">';
+
+        foreach ($links as $link) {
+            $label = (string) ($link['label'] ?? '');
+            $url = (string) ($link['url'] ?? '');
+
+            if ($label === '' || $url === '') {
+                continue;
+            }
+
+            echo '<p><a class="button" href="' . esc_url($url) . '">' . esc_html($label) . '</a></p>';
+        }
+
+        echo '</div>';
     }
 }

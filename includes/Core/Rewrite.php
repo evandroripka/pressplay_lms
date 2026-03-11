@@ -3,6 +3,13 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Rewrite
 {
+    private const SCHEMA_VERSION = '20260311_student_area_v1';
+
+    public static function get_schema_version(): string
+    {
+        return self::SCHEMA_VERSION;
+    }
+
     private static function get_request_path(): string
     {
         $path = (string) wp_parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
@@ -18,6 +25,7 @@ class PRESS_LMS_Rewrite
     public static function init()
     {
         add_action('init', [__CLASS__, 'add_rules']);
+        add_action('init', [__CLASS__, 'maybe_flush_rules'], 99);
         add_filter('query_vars', [__CLASS__, 'query_vars']);
         add_filter('redirect_canonical', [__CLASS__, 'filter_canonical_redirect'], 10, 2);
         add_action('template_redirect', [__CLASS__, 'template_router'], 0);
@@ -42,6 +50,13 @@ class PRESS_LMS_Rewrite
         // Student dashboard route: /meus-cursos
         add_rewrite_rule('^meus-cursos/?$', 'index.php?press_my_courses=1', 'top');
 
+        // Student dashboard sections with dedicated URLs.
+        add_rewrite_rule(
+            '^meus-cursos/(certificados|perfil|trocar-senha)/?$',
+            'index.php?press_my_courses=1&press_student_area=$matches[1]',
+            'top'
+        );
+
         // Student certificate route: /meus-cursos/certificado/{course}
         add_rewrite_rule(
             '^meus-cursos/certificado/([^/]+)/?$',
@@ -61,16 +76,30 @@ class PRESS_LMS_Rewrite
         $vars[] = 'press_course_slug';
         $vars[] = 'press_lesson_slug';
         $vars[] = 'press_my_courses';
+        $vars[] = 'press_student_area';
         $vars[] = 'press_student_certificate';
         $vars[] = 'press_course_archive';
         $vars[] = 'press_register';
         return $vars;
     }
 
+    public static function maybe_flush_rules(): void
+    {
+        $stored_version = (string) get_option('press_lms_rewrite_schema_version', '');
+
+        if ($stored_version === self::SCHEMA_VERSION) {
+            return;
+        }
+
+        flush_rewrite_rules(false);
+        update_option('press_lms_rewrite_schema_version', self::SCHEMA_VERSION, false);
+    }
+
     public static function template_router()
     {
         $course_slug = sanitize_title((string) get_query_var('press_course_slug'));
         $lesson_slug = sanitize_title((string) get_query_var('press_lesson_slug'));
+        $student_area = sanitize_key((string) get_query_var('press_student_area'));
         $student_certificate = sanitize_title((string) get_query_var('press_student_certificate'));
         $my_courses = (bool) get_query_var('press_my_courses');
         $course_archive = (bool) get_query_var('press_course_archive');
@@ -81,6 +110,11 @@ class PRESS_LMS_Rewrite
         if ($request_path !== '') {
             if ($student_certificate === '' && preg_match('#^meus-cursos/certificado/([^/]+)/?$#', $request_path, $matches)) {
                 $student_certificate = sanitize_title($matches[1]);
+            }
+
+            if ($student_area === '' && preg_match('#^meus-cursos/(certificados|perfil|trocar-senha)/?$#', $request_path, $matches)) {
+                $student_area = sanitize_key($matches[1]);
+                $my_courses = true;
             }
 
             if (!$course_archive && preg_match('#^cursos/?$#', $request_path)) {
@@ -129,6 +163,9 @@ class PRESS_LMS_Rewrite
 
         // 5) Student dashboard
         if ($my_courses) {
+            if ($student_area !== '') {
+                set_query_var('press_student_area', $student_area);
+            }
             PRESS_LMS_Frontend::render_my_courses();
             exit;
         }
@@ -144,7 +181,7 @@ class PRESS_LMS_Rewrite
     {
         $path = self::get_request_path();
 
-        if ($path !== '' && preg_match('#^(curso/[^/]+(?:/aula/[^/]+)?|meus-cursos(?:/certificado/[^/]+)?|cursos|cadastro)/?$#', $path)) {
+        if ($path !== '' && preg_match('#^(curso/[^/]+(?:/aula/[^/]+)?|meus-cursos(?:/(?:certificados|perfil|trocar-senha|certificado/[^/]+))?|cursos|cadastro)/?$#', $path)) {
             return false;
         }
 

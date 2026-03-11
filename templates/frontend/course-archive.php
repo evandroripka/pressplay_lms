@@ -78,6 +78,9 @@ $catalog_page_title = (string) ($catalog_page_title_var ?? 'Cursos');
                 <?php if (!empty($course['duration_label'])): ?>
                   <span><i class="fa-light fa-clock"></i> <?php echo esc_html((string) $course['duration_label']); ?></span>
                 <?php endif; ?>
+                <?php if (!empty($course['access_label'])): ?>
+                  <span><i class="fa-light fa-calendar"></i> <?php echo esc_html((string) $course['access_label']); ?></span>
+                <?php endif; ?>
               </div>
 
               <?php if (!empty($course['features']) && is_array($course['features'])): ?>

@@ -8,6 +8,7 @@ $filter_course = (int) ($filter_course ?? 0);
 $filter_status = (string) ($filter_status ?? '');
 $filter_search = (string) ($filter_search ?? '');
 $filter_sort   = (string) ($filter_sort ?? 'date_desc');
+$now_ts = current_time('timestamp');
 
 function presslms_admin_student_progress_percent($completed, $total)
 {
@@ -64,6 +65,7 @@ function presslms_admin_student_progress_percent($completed, $total)
                                         <option value="">Todos os status</option>
                                         <option value="pending" <?php selected($filter_status, 'pending'); ?>>Pendente</option>
                                         <option value="active" <?php selected($filter_status, 'active'); ?>>Ativo</option>
+                                        <option value="expired" <?php selected($filter_status, 'expired'); ?>>Expirado</option>
                                     </select>
                                 </div>
                             </div>
@@ -144,8 +146,12 @@ function presslms_admin_student_progress_percent($completed, $total)
 
                                 $status_class = 'is-light';
                                 $status_label = 'Desconhecido';
+                                $is_expired = !empty($student->expires_at) && strtotime((string) $student->expires_at) <= $now_ts;
 
-                                if ($student->status === 'active') {
+                                if ($student->status === 'active' && $is_expired) {
+                                    $status_class = 'is-danger is-light';
+                                    $status_label = 'Expirado';
+                                } elseif ($student->status === 'active') {
                                     $status_class = 'is-success is-light';
                                     $status_label = 'Ativo';
                                 } elseif ($student->status === 'pending') {
@@ -198,10 +204,23 @@ function presslms_admin_student_progress_percent($completed, $total)
 
                                     <td>
                                         <?php
-                                        echo !empty($student->created_at)
-                                            ? esc_html(date_i18n('d/m/Y H:i', strtotime($student->created_at)))
+                                        $primary_date = !empty($student->purchased_at) ? $student->purchased_at : $student->created_at;
+                                        echo !empty($primary_date)
+                                            ? esc_html(date_i18n('d/m/Y H:i', strtotime((string) $primary_date)))
                                             : '—';
                                         ?>
+                                        <div class="presslms-muted">
+                                            <?php
+                                            if ($student->status === 'active' && empty($student->expires_at)) {
+                                                echo 'Vitalício';
+                                            } elseif (!empty($student->expires_at)) {
+                                                echo ($is_expired ? 'Expirou em ' : 'Válido até ')
+                                                    . esc_html(date_i18n('d/m/Y', strtotime((string) $student->expires_at)));
+                                            } else {
+                                                echo '—';
+                                            }
+                                            ?>
+                                        </div>
                                     </td>
 
                                     <td>
