@@ -5,8 +5,9 @@ class PRESS_LMS_Lesson_Meta
 {
     const META_COURSE_ID = '_press_lesson_course_id';
     const META_VIDEO_URL = '_press_lesson_video_url';
+    const META_VIMEO_THUMBNAIL = '_press_lesson_vimeo_thumbnail_url';
 
-    // novo formato (v2) -> array de itens
+    // Store lesson materials in the structured v2 array format.
     const META_MATERIALS = '_press_lesson_materials_v2';
 
     public static function init()
@@ -14,7 +15,7 @@ class PRESS_LMS_Lesson_Meta
         add_action('add_meta_boxes_press_lesson', [__CLASS__, 'add_boxes']);
         add_action('save_post_press_lesson', [__CLASS__, 'save'], 10, 2);
 
-        // Media Uploader
+        // Enable the WordPress media uploader for lesson attachments.
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_admin_assets']);
     }
 
@@ -42,28 +43,25 @@ class PRESS_LMS_Lesson_Meta
 
     private static function generate_item_id()
     {
-        // id único curto e estável para o item (não depende do índice)
-        // ex: mt_65f2c1a9a3d1b
+        // Generate a stable short identifier that does not depend on the row index.
         return 'mt_' . substr(wp_generate_uuid4(), 0, 12);
     }
 
     /**
-     * Migra formatos antigos (se existirem) para o novo formato.
-     * - antigo: _press_lesson_materials (array de URLs)
-     * - novo: _press_lesson_materials_v2 (array itens)
+     * Migrate legacy lesson materials into the structured v2 format when needed.
      */
     private static function load_materials($post_id)
     {
         $v2 = get_post_meta($post_id, self::META_MATERIALS, true);
         if (is_array($v2) && !empty($v2)) {
-            // normaliza por segurança
+            // Normalize stored rows defensively before using them.
             if (class_exists('PRESS_LMS_Materials')) {
                 return PRESS_LMS_Materials::normalize_items($v2);
             }
             return $v2;
         }
 
-        // tentativa de ler o meta antigo caso exista no seu site
+        // Fall back to the legacy URL-only meta key when present.
         $legacy = get_post_meta($post_id, '_press_lesson_materials', true);
         if (is_array($legacy) && !empty($legacy)) {
             $items = [];
@@ -99,13 +97,13 @@ class PRESS_LMS_Lesson_Meta
 
     private static function admin_icon($kind)
     {
-        // usa seus svgs reais da pasta assets/svg
+        // Reuse the SVG icons already shipped with the plugin.
         if (class_exists('PRESS_LMS_Materials')) {
             $img = PRESS_LMS_Materials::get_icon_img_html($kind, 18);
             return '<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;background:#f6f7f7;border:1px solid #e5e5e5;">' . $img . '</span>';
         }
 
-        // fallback simples
+        // Fall back to a generic attachment icon when the material helper is unavailable.
         return '<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;background:#f6f7f7;border:1px solid #e5e5e5;font-size:16px;">📎</span>';
     }
 
@@ -122,12 +120,12 @@ class PRESS_LMS_Lesson_Meta
 
         $materials = self::load_materials($post->ID);
 
-        // Vimeo status
+        // Current Vimeo validation status for this lesson.
         $vimeo_id    = (int) get_post_meta($post->ID, '_press_lesson_vimeo_id', true);
         $vimeo_title = (string) get_post_meta($post->ID, '_press_lesson_vimeo_title', true);
         $vimeo_error = (string) get_post_meta($post->ID, '_press_lesson_vimeo_error', true);
 
-        // Lista cursos
+        // Courses available for linking this lesson.
         $courses = get_posts([
             'post_type' => 'press_course',
             'numberposts' => -1,
@@ -156,7 +154,7 @@ class PRESS_LMS_Lesson_Meta
         echo '<p><label><strong>Vídeo (Vimeo/YouTube URL)</strong></label><br>';
         echo '<input type="url" name="press_lesson_video_url" value="' . esc_attr($video_url) . '" class="widefat" placeholder="https://vimeo.com/... ou https://youtu.be/..."></p>';
 
-        // Vimeo box
+        // Vimeo validation and preview block.
         echo '<div style="padding:12px;border:1px solid #e5e5e5;border-radius:10px;background:#fff;margin:10px 0;">';
         echo '<strong>Vimeo (validação via API)</strong><br>';
 
@@ -190,9 +188,7 @@ class PRESS_LMS_Lesson_Meta
         echo '</select>';
         echo '</div>';
 
-        // ==========================
-        // Materiais (v2)
-        // ==========================
+        // Lesson materials editor.
         echo '<hr>';
         echo '<div style="margin-top:10px;">';
         echo '<p style="margin:0 0 6px 0;"><strong>Materiais</strong></p>';
@@ -213,10 +209,10 @@ class PRESS_LMS_Lesson_Meta
             }
         }
 
-        echo '</div>'; // list
-        echo '</div>'; // wrap
+        echo '</div>';
+        echo '</div>';
 
-        // Template hidden usado pelo JS
+        // Hidden row template used by the inline materials editor.
         echo '<script type="text/template" id="pressMaterialRowTpl">';
         self::render_material_row('__INDEX__', [
             'id' => '__ID__',
@@ -239,7 +235,7 @@ class PRESS_LMS_Lesson_Meta
                 }
 
                 function uid() {
-                    // id estável por item
+                    // Generate a stable client-side identifier for each row.
                     return 'mt_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
                 }
 
@@ -338,11 +334,11 @@ class PRESS_LMS_Lesson_Meta
                                 });
                                 if (!items.length) return;
 
-                                // preenche o primeiro no row atual...
+                                // Apply the first file to the current row.
                                 var first = items.shift();
                                 applyAttachmentToRow(row, first);
 
-                                // ...e cria rows extras pros restantes
+                                // Create extra rows for the remaining selected files.
                                 items.forEach(function(att) {
                                     addRow({
                                         type: 'file',
@@ -401,7 +397,7 @@ class PRESS_LMS_Lesson_Meta
                     var row = wrap.firstElementChild;
                     if (!row) return;
 
-                    // aplica dados iniciais
+                    // Apply the initial row payload.
                     if (data) {
                         var typeEl = qs('select.press-material-type', row);
                         var urlLinkEl = qs('.press-material-link-url', row);
@@ -413,7 +409,7 @@ class PRESS_LMS_Lesson_Meta
                         if (nameEl && data.name) nameEl.value = data.name;
                         if (attEl && data.attachment_id) attEl.value = data.attachment_id;
 
-                        // url pode cair em dois inputs (file/link)
+                        // Mirror the URL into both inputs because the row can switch types.
                         if (urlFileEl && data.url) urlFileEl.value = data.url;
                         if (urlLinkEl && data.url) urlLinkEl.value = data.url;
 
@@ -425,10 +421,10 @@ class PRESS_LMS_Lesson_Meta
                     updateEmptyState();
                 }
 
-                // bind existentes
+                // Bind rows already rendered by PHP.
                 qsa('.press-material-row').forEach(bindRow);
 
-                // buttons
+                // Bind toolbar buttons.
                 var addFile = qs('#pressAddFile');
                 var addLink = qs('#pressAddLink');
 
@@ -500,10 +496,10 @@ class PRESS_LMS_Lesson_Meta
         echo '</div>';
         echo '</div>';
 
-        // hidden id (estável)
+        // Persist the stable item identifier.
         echo '<input type="hidden" name="press_material_id[' . esc_attr($idx_attr) . ']" value="' . esc_attr($id_attr) . '">';
 
-        // type
+        // Material type selector.
         echo '<p style="margin:0 0 8px 0;">';
         echo '<label style="display:block;font-weight:600;margin-bottom:4px;">Tipo</label>';
         echo '<select class="widefat press-material-type" name="press_material_type[' . esc_attr($idx_attr) . ']">';
@@ -512,13 +508,13 @@ class PRESS_LMS_Lesson_Meta
         echo '</select>';
         echo '</p>';
 
-        // name
+        // Display name shown to the student.
         echo '<p style="margin:0 0 8px 0;">';
         echo '<label style="display:block;font-weight:600;margin-bottom:4px;">Nome (texto exibido)</label>';
         echo '<input class="widefat press-material-name" name="press_material_name[' . esc_attr($idx_attr) . ']" value="' . esc_attr($name) . '" placeholder="Ex.: Apostila em PDF / Slides / Link do Drive">';
         echo '</p>';
 
-        // file box
+        // File picker fields.
         echo '<div class="press-material-file">';
         echo '<p style="margin:0 0 8px 0;">';
         echo '<label style="display:block;font-weight:600;margin-bottom:4px;">Arquivo</label>';
@@ -531,7 +527,7 @@ class PRESS_LMS_Lesson_Meta
         echo '</p>';
         echo '</div>';
 
-        // link box
+        // External link fields.
         echo '<div class="press-material-link">';
         echo '<p style="margin:0 0 8px 0;">';
         echo '<label style="display:block;font-weight:600;margin-bottom:4px;">URL</label>';
@@ -565,9 +561,7 @@ class PRESS_LMS_Lesson_Meta
         clean_post_cache($post_id);
         update_post_meta($post_id, self::META_VIDEO_URL, $video_url);
 
-        // ==========================
-        // Materiais v2 (array único por aula)
-        // ==========================
+        // Rebuild the structured v2 materials array from the submitted fields.
         $items = [];
 
         $ids       = $_POST['press_material_id'] ?? [];
@@ -589,7 +583,7 @@ class PRESS_LMS_Lesson_Meta
 
                 $att_id = isset($atts[$k]) ? intval($atts[$k]) : 0;
 
-                // pega URL dependendo do tipo
+                // Read the URL from the field set that matches the current type.
                 if ($type === 'file') {
                     $url = isset($urls_file[$k]) ? (string)$urls_file[$k] : '';
                 } else {
@@ -598,16 +592,16 @@ class PRESS_LMS_Lesson_Meta
 
                 $url = trim((string) $url);
 
-                // valida por tipo
+                // Validate the row based on the selected material type.
                 if ($type === 'file') {
-                    // se veio attachment, sempre prioriza URL oficial do WP
+                    // Prefer the official attachment URL whenever an attachment ID is available.
                     if ($att_id > 0) {
                         $att_url = wp_get_attachment_url($att_id);
                         if ($att_url) {
                             $url = esc_url_raw($att_url);
                         }
                     } else {
-                        // se não tem attachment_id, aceita URL manual (caso raro)
+                        // Accept a manual file URL when no attachment ID is present.
                         $url = $url ? esc_url_raw($url) : '';
                     }
 
@@ -618,7 +612,7 @@ class PRESS_LMS_Lesson_Meta
                     $url = $url ? esc_url_raw($url) : '';
                     if ($url === '') continue;
 
-                    // link não usa attachment_id
+                    // External links never keep an attachment reference.
                     $att_id = 0;
                 }
 
@@ -636,7 +630,7 @@ class PRESS_LMS_Lesson_Meta
             }
         }
 
-        // Dedup por ID (garante "array único" mesmo se o DOM duplicar campos)
+        // De-duplicate rows by ID in case the DOM duplicated submitted fields.
         $dedup = [];
         foreach ($items as $it) {
             if (!is_array($it) || empty($it['id'])) continue;
@@ -644,7 +638,7 @@ class PRESS_LMS_Lesson_Meta
         }
         $items = array_values($dedup);
 
-        // Normaliza (remove lixo, preenche url do attachment se necessário, calcula kind depois)
+        // Normalize the stored payload before saving it.
         if (class_exists('PRESS_LMS_Materials')) {
             $items = PRESS_LMS_Materials::normalize_items($items);
             if (is_array($items)) $items = array_values($items);
@@ -654,15 +648,14 @@ class PRESS_LMS_Lesson_Meta
         }
         update_post_meta($post_id, self::META_MATERIALS, $items);
 
-        // ==========================
-        // Vimeo validation (mantém como estava)
-        // ==========================
+        // Validate Vimeo metadata and cache the current video payload.
         if ($video_url === '' || stripos($video_url, 'vimeo.com') === false) {
             delete_post_meta($post_id, '_press_lesson_vimeo_id');
             delete_post_meta($post_id, '_press_lesson_vimeo_title');
             delete_post_meta($post_id, '_press_lesson_vimeo_link');
             delete_post_meta($post_id, '_press_lesson_vimeo_embed_html');
             delete_post_meta($post_id, '_press_lesson_vimeo_error');
+            delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
             return;
         }
 
@@ -674,6 +667,7 @@ class PRESS_LMS_Lesson_Meta
         $video_id = PRESS_LMS_Vimeo::parse_video_id($video_url);
         if (!$video_id) {
             update_post_meta($post_id, '_press_lesson_vimeo_error', 'Não foi possível extrair o ID do vídeo do Vimeo.');
+            delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
             return;
         }
 
@@ -683,6 +677,7 @@ class PRESS_LMS_Lesson_Meta
             update_post_meta($post_id, '_press_lesson_vimeo_link', $video_url);
             update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id));
             update_post_meta($post_id, '_press_lesson_vimeo_error', 'Token Vimeo não configurado. Configure em Pressplay LMS → Configurações.');
+            delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
             return;
         }
 
@@ -694,6 +689,7 @@ class PRESS_LMS_Lesson_Meta
             update_post_meta($post_id, '_press_lesson_vimeo_link', $video_url);
             update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id));
             update_post_meta($post_id, '_press_lesson_vimeo_error', $data->get_error_message());
+            delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
             return;
         }
 
@@ -702,10 +698,17 @@ class PRESS_LMS_Lesson_Meta
             $title = (string)$data['name'];
         }
 
+        $thumbnail_url = PRESS_LMS_Vimeo::extract_thumbnail_url($data);
+
         update_post_meta($post_id, '_press_lesson_vimeo_id', (int)$video_id);
         update_post_meta($post_id, '_press_lesson_vimeo_title', $title);
         update_post_meta($post_id, '_press_lesson_vimeo_link', $video_url);
         update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id));
+        if ($thumbnail_url !== '') {
+            update_post_meta($post_id, self::META_VIMEO_THUMBNAIL, esc_url_raw($thumbnail_url));
+        } else {
+            delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
+        }
         delete_post_meta($post_id, '_press_lesson_vimeo_error');
     }
 }

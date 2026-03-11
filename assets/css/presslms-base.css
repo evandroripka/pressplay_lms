@@ -1,17 +1,17 @@
-/* assets/css/presslms-base.css */
+/* Shared visual tokens and base UI primitives for the LMS frontend. */
 .presslms {
 
-  /* 🎨 CORES LIGHT MODERN */
+  /* Core color system. */
   --pl-bg: #f6f8fb;
   --pl-surface: #ffffff;
   --pl-surface-2: #f2f4f8;
   --pl-border: #e4e8f0;
 
-  --pl-text: #1f2937;       /* cinza escuro elegante */
-  --pl-muted: #6b7280;      /* cinza médio */
+  --pl-text: #1f2937;       /* Primary text color. */
+  --pl-muted: #6b7280;      /* Secondary text color. */
 
-  --pl-primary: #1e3a8a;    /* azul escuro para títulos */
-  --pl-success: #16a34a;    /* verde botão comprar */
+  --pl-primary: #1e3a8a;    /* Primary accent for headings and links. */
+  --pl-success: #16a34a;    /* Primary CTA color. */
   --pl-danger: #ef4444;
 
   --pl-radius: 16px;
@@ -26,14 +26,14 @@
   font-family: var(--pl-font);
 }
 
-/* Container */
+/* Layout container. */
 .presslms__container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 28px 18px 80px;
 }
 
-/* Cards */
+/* Shared card surface. */
 .presslms-card {
   background: var(--pl-surface);
   border: 1px solid var(--pl-border);
@@ -42,7 +42,7 @@
   padding: 20px;
 }
 
-/* Header do card */
+/* Card header. */
 .presslms-card__header {
   display: flex;
   align-items: center;
@@ -52,7 +52,7 @@
   margin-bottom: 16px;
 }
 
-/* Títulos */
+/* Heading styles. */
 .presslms-h1 {
   font-size: clamp(22px, 2.2vw, 32px);
   line-height: 1.15;
@@ -73,11 +73,11 @@
   font-weight: 600;
 }
 
-/* Textos */
+/* Utility text styles. */
 .presslms-muted { color: var(--pl-muted); }
 .presslms-strong { font-weight: 700; }
 
-/* Botões */
+/* Shared button styles. */
 .presslms-btn {
   display: inline-flex;
   align-items: center;
@@ -99,7 +99,7 @@
   transform: translateY(-1px);
 }
 
-/* Botão principal (Comprar Curso) */
+/* Primary action button. */
 .presslms-btn--primary {
   border: none;
   background: var(--pl-success);
@@ -111,14 +111,14 @@
   background: #15803d;
 }
 
-/* Botão ghost */
+/* Icon-only button. */
 .presslms-btn--ghost {
   width: 42px;
   justify-content: center;
   padding: 0;
 }
 
-/* Chips */
+/* Metadata chips. */
 .presslms-chip {
   display: inline-flex;
   align-items: center;
@@ -133,7 +133,7 @@
 
 .presslms-chip b { color: var(--pl-text); }
 
-/* Conteúdo */
+/* Rich text content. */
 .presslms-content {
   color: var(--pl-text);
   line-height: 1.7;
@@ -147,7 +147,7 @@
   text-decoration: underline;
 }
 
-/* Breadcrumbs */
+/* Breadcrumb styles. */
 .presslms-breadcrumbs {
   display: flex;
   align-items: center;

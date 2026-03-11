@@ -35,6 +35,50 @@ class PRESS_LMS_Enrollments
         return !empty($id);
     }
 
+    public static function get_active_enrollments(int $user_id): array
+    {
+        global $wpdb;
+
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return [];
+        }
+
+        $table = PRESS_LMS_Database::table('enrollments');
+        $posts_table = $wpdb->posts;
+        $now = current_time('mysql');
+
+        $sql = "
+            SELECT
+                e.id,
+                e.course_id,
+                e.status,
+                e.purchased_at,
+                e.expires_at,
+                e.payment_provider,
+                e.order_ref,
+                e.created_at,
+                e.updated_at,
+                p.post_title AS course_title,
+                p.post_name AS course_slug,
+                p.post_status AS course_post_status
+            FROM {$table} e
+            INNER JOIN {$posts_table} p
+                ON p.ID = e.course_id
+            WHERE e.user_id = %d
+              AND e.status = %s
+              AND (e.expires_at IS NULL OR e.expires_at > %s)
+              AND p.post_type = %s
+            ORDER BY COALESCE(e.purchased_at, e.created_at) DESC, e.id DESC
+        ";
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare($sql, $user_id, 'active', $now, 'press_course')
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
     public static function get_or_create_pending(int $user_id, int $course_id, string $provider = 'woocommerce'): int
     {
         global $wpdb;
@@ -47,7 +91,7 @@ class PRESS_LMS_Enrollments
         $table = PRESS_LMS_Database::table('enrollments');
         $now = current_time('mysql');
 
-        // Se já existe active e ainda válido, retorna id
+        // Reuse the active enrollment when access is still valid.
         $sql_active = "SELECT id FROM {$table}
                        WHERE user_id=%d AND course_id=%d
                          AND status=%s
@@ -56,7 +100,7 @@ class PRESS_LMS_Enrollments
         $active_id = $wpdb->get_var($wpdb->prepare($sql_active, $user_id, $course_id, 'active', $now));
         if ($active_id) return (int)$active_id;
 
-        // Se já existe pending, atualiza timestamp e retorna
+        // Reuse a pending enrollment instead of creating duplicates.
         $sql_pending = "SELECT id FROM {$table}
                         WHERE user_id=%d AND course_id=%d AND status=%s
                         LIMIT 1";
@@ -69,7 +113,7 @@ class PRESS_LMS_Enrollments
             return (int)$pending_id;
         }
 
-        // Cria novo pending
+        // Create a fresh pending enrollment.
         $wpdb->insert($table, [
             'user_id' => $user_id,
             'course_id' => $course_id,
@@ -91,15 +135,15 @@ class PRESS_LMS_Enrollments
         $user = get_userdata($user_id);
         if (!$user) return;
 
-        // não mexe em admin
+        // Never override administrator roles.
         if (user_can($user_id, 'manage_options')) return;
 
-        // se já for aluno, ok
+        // Leave the role untouched when the user is already a student.
         if (in_array('press_student', (array) $user->roles, true)) {
             return;
         }
 
-        // define role principal como aluno
+        // Make the student role the primary role for LMS users.
         $user->set_role('press_student');
     }
     public static function activate_enrollment(int $user_id, int $course_id, int $order_id, string $provider = 'woocommerce'): void
@@ -114,7 +158,7 @@ class PRESS_LMS_Enrollments
         $now = date('Y-m-d H:i:s', $now_ts);
         $expires = date('Y-m-d H:i:s', strtotime('+1 year', $now_ts));
 
-        // Se existir registro, atualiza; senão cria.
+        // Update the existing enrollment or create a new one if needed.
         $sql = "SELECT id FROM {$table} WHERE user_id=%d AND course_id=%d LIMIT 1";
         $id = $wpdb->get_var($wpdb->prepare($sql, $user_id, $course_id));
 

@@ -277,7 +277,7 @@ class PRESS_LMS_Course_Meta
         $price      = get_post_meta($post->ID, '_press_course_price', true);
         $is_paused  = get_post_meta($post->ID, '_press_course_paused', true) === 'yes';
 
-        // Carrega todos os professores cadastrados
+        // Load all published teachers for the course owner selector.
         $teachers = get_posts([
             'post_type' => 'press_teacher',
             'posts_per_page' => -1,
@@ -631,7 +631,7 @@ class PRESS_LMS_Course_Meta
 
     public static function save($post_id, $post)
     {
-        // ✅ Segurança primeiro
+        // Verify the metabox nonce and bail out on invalid saves.
         if (!isset($_POST['press_course_meta_nonce']) || !wp_verify_nonce($_POST['press_course_meta_nonce'], 'press_course_meta_save')) {
             return;
         }
@@ -645,7 +645,7 @@ class PRESS_LMS_Course_Meta
                 wp_kses_post($_POST['press_course_certificate_html'])
             );
         }
-        // Salva preço
+        // Persist the course price used to sync WooCommerce products.
         if (isset($_POST['press_course_price'])) {
             $raw = str_replace(',', '.', sanitize_text_field($_POST['press_course_price']));
             $raw = preg_replace('/[^0-9.]/', '', $raw);
@@ -658,7 +658,7 @@ class PRESS_LMS_Course_Meta
                 wp_kses_post($_POST['press_course_certificate_html'])
             );
         }
-        // Salva trailer
+        // Persist the optional course trailer URL.
         if (isset($_POST['press_course_trailer'])) {
             update_post_meta($post_id, '_press_course_trailer', esc_url_raw($_POST['press_course_trailer']));
         }
@@ -685,8 +685,7 @@ class PRESS_LMS_Course_Meta
                 PRESS_LMS_Woo::sync_course_product_state((int) $post_id);
             }
         }
-        // ❌ Removido: salvar product_id manualmente
-        // Isso agora é responsabilidade do PRESS_LMS_Woo (criação automática).
+        // Product synchronization is handled by the WooCommerce integration layer.
         if (isset($_POST['press_course_certificate_description'])) {
             update_post_meta(
                 $post_id,

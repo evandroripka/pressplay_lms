@@ -10,6 +10,16 @@ class PRESSLMS_Assets
 
   public static function enqueue_frontend(): void
   {
+    if (self::is_student_route()) {
+      self::enqueue_student_assets();
+      return;
+    }
+
+    if (self::is_catalog_route()) {
+      self::enqueue_catalog_assets();
+      return;
+    }
+
     if (self::is_lesson_route()) {
       self::enqueue_lesson_assets();
       return;
@@ -20,9 +30,28 @@ class PRESSLMS_Assets
     }
   }
 
+  private static function is_student_route(): bool
+  {
+    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    $path = trim($path, '/');
+
+    if ($path === '') return false;
+
+    return (bool) preg_match('#^meus-cursos(?:/.*)?$#', $path);
+  }
+
+  private static function is_catalog_route(): bool
+  {
+    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    $path = trim($path, '/');
+
+    if ($path === '') return false;
+
+    return (bool) preg_match('#^cursos/?$#', $path);
+  }
+
   /**
-   * Detecta:
-   * /curso/{course-slug}/aula/{lesson-slug}/
+   * Match lesson routes in the form /curso/{course-slug}/aula/{lesson-slug}/.
    */
   private static function is_lesson_route(): bool
   {
@@ -35,8 +64,7 @@ class PRESSLMS_Assets
   }
 
   /**
-   * Detecta:
-   * /curso/{course-slug}/
+   * Match course routes in the form /curso/{course-slug}/.
    */
   private static function is_course_route(): bool
   {
@@ -59,7 +87,7 @@ class PRESSLMS_Assets
       );
     }
 
-    // FontAwesome 7 Pro
+    // Load the shared icon set once for all LMS frontend screens.
     $fa_base = 'https://site-assets.fontawesome.com/releases/v7.2.0/css/';
 
     if (!wp_style_is('presslms-fa7-core', 'enqueued')) {
@@ -136,6 +164,34 @@ class PRESSLMS_Assets
       wp_enqueue_style(
         'presslms-lesson',
         PRESS_LMS_URL . 'assets/css/presslms-lesson.css',
+        ['presslms-base'],
+        PRESS_LMS_VERSION
+      );
+    }
+  }
+
+  private static function enqueue_student_assets(): void
+  {
+    self::enqueue_shared_styles();
+
+    if (!wp_style_is('presslms-student', 'enqueued')) {
+      wp_enqueue_style(
+        'presslms-student',
+        PRESS_LMS_URL . 'assets/css/presslms-student.css',
+        ['presslms-base'],
+        PRESS_LMS_VERSION
+      );
+    }
+  }
+
+  private static function enqueue_catalog_assets(): void
+  {
+    self::enqueue_shared_styles();
+
+    if (!wp_style_is('presslms-catalog', 'enqueued')) {
+      wp_enqueue_style(
+        'presslms-catalog',
+        PRESS_LMS_URL . 'assets/css/presslms-catalog.css',
         ['presslms-base'],
         PRESS_LMS_VERSION
       );

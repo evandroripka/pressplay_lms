@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let lastKnownSeconds = 0;
   let markedCompleted = false;
 
-  // evita posts duplicados inúteis, mas sem bloquear ended
+  // Avoid duplicate progress submissions while still allowing the ended event to post.
   let lastSentSeconds = -1;
   let lastSentCompleted = null;
 
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function () {
       markedCompleted = true;
     }
 
-    // salva em toda pausa real acima de 0
+    // Save progress on meaningful pauses above zero seconds.
     if (seconds > 0) {
       sendProgress(seconds, completed, false);
     }
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // fallback ao sair da página
+  // Fallback submission when the visitor leaves the page.
   window.addEventListener('pagehide', function () {
     sendProgress(lastKnownSeconds || 0, markedCompleted, true);
   });

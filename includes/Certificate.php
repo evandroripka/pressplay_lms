@@ -422,27 +422,40 @@ class PRESS_LMS_Certificate
         echo '</html>';
     }
 
-    public static function preview_certificate(): void
+    public static function validate_certificate_access(int $user_id, int $course_id, bool $allow_admin_override = true)
     {
         if (!is_user_logged_in()) {
-            wp_die('Você precisa estar logado.');
+            return new WP_Error('login_required', 'Você precisa estar logado.');
         }
 
-        $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
-        $user_id   = isset($_GET['user_id']) ? (int) $_GET['user_id'] : get_current_user_id();
-
-        if ($course_id <= 0) {
-            wp_die('Curso inválido.');
+        if ($course_id <= 0 || get_post_type($course_id) !== 'press_course') {
+            return new WP_Error('course_invalid', 'Curso inválido.');
         }
 
-        if (!current_user_can('manage_options')) {
-            if ($user_id !== get_current_user_id()) {
-                wp_die('Permissão negada.');
-            }
+        if ($allow_admin_override && current_user_can('manage_options')) {
+            return true;
+        }
 
-            if (!self::is_course_completed($user_id, $course_id)) {
-                wp_die('Certificado disponível somente após concluir o curso.');
-            }
+        $current_user_id = get_current_user_id();
+
+        if ($user_id <= 0 || $user_id !== $current_user_id) {
+            return new WP_Error('forbidden', 'Permissão negada.');
+        }
+
+        if (!self::is_course_completed($user_id, $course_id)) {
+            return new WP_Error('certificate_unavailable', 'Certificado disponível somente após concluir o curso.');
+        }
+
+        return true;
+    }
+
+    public static function render_certificate_for_user(int $course_id, int $user_id = 0, bool $allow_admin_override = true): void
+    {
+        $user_id = $user_id > 0 ? $user_id : get_current_user_id();
+        $validation = self::validate_certificate_access($user_id, $course_id, $allow_admin_override);
+
+        if (is_wp_error($validation)) {
+            wp_die($validation->get_error_message());
         }
 
         $data = self::get_certificate_data($user_id, $course_id);
@@ -455,8 +468,17 @@ class PRESS_LMS_Certificate
         exit;
     }
 
+    public static function preview_certificate(): void
+    {
+        $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
+        $user_id   = isset($_GET['user_id']) ? (int) $_GET['user_id'] : get_current_user_id();
+        self::render_certificate_for_user($course_id, $user_id, true);
+    }
+
     public static function download_certificate(): void
     {
-        self::preview_certificate();
+        $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
+        $user_id   = isset($_GET['user_id']) ? (int) $_GET['user_id'] : get_current_user_id();
+        self::render_certificate_for_user($course_id, $user_id, true);
     }
 }

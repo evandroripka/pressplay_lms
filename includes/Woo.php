@@ -5,22 +5,25 @@ class PRESS_LMS_Woo
 {
     public static function init()
     {
-        // cria/atualiza produto quando salvar curso
+        // Keep the linked WooCommerce product in sync with the course post.
         add_action('save_post_press_course', [__CLASS__, 'maybe_sync_product'], 20, 2);
-        // cria pending ao adicionar no carrinho pela loja normal
+        // Create pending enrollments when course products enter the cart.
         add_action('woocommerce_add_to_cart', [__CLASS__, 'handle_add_to_cart'], 10, 6);
-        // garante pending quando o pedido é criado no checkout
+        // Ensure pending enrollments also exist when the order is created at checkout.
         add_action('woocommerce_checkout_order_processed', [__CLASS__, 'handle_order_processed'], 10, 3);
-        // ativa matrícula quando pedido for pago/processado
+        // Activate enrollments once the order is paid or processed.
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_completed'], 10, 1);
         add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);
         add_filter('woocommerce_is_purchasable', [__CLASS__, 'filter_is_purchasable'], 10, 2);
+        add_filter('woocommerce_is_sold_individually', [__CLASS__, 'filter_is_sold_individually'], 10, 2);
+        add_filter('woocommerce_add_to_cart_validation', [__CLASS__, 'validate_add_to_cart'], 10, 6);
+        add_action('woocommerce_before_calculate_totals', [__CLASS__, 'normalize_course_cart_quantities'], 20, 1);
+        add_filter('woocommerce_loop_add_to_cart_link', [__CLASS__, 'filter_loop_add_to_cart_link'], 10, 3);
+        add_action('wp', [__CLASS__, 'maybe_swap_single_product_button']);
     }
 
     /**
-     * Quando um produto é adicionado ao carrinho via loja normal do Woo.
-     * Se o produto estiver ligado a um curso e o usuário estiver logado,
-     * cria/atualiza matrícula pending.
+     * Create or refresh a pending enrollment when a linked course product is added to the cart.
      */
     public static function handle_add_to_cart($cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data)
     {
@@ -28,7 +31,7 @@ class PRESS_LMS_Woo
 
         $user_id = get_current_user_id();
         if ($user_id <= 0) {
-            // guest ainda não tem user_id, então deixamos o checkout_order_processed cobrir
+            // Guest checkouts are handled later when the order is created.
             return;
         }
 
@@ -40,9 +43,7 @@ class PRESS_LMS_Woo
     }
 
     /**
-     * Quando o pedido é criado no checkout.
-     * Garante que exista matrícula pending mesmo se o usuário não passou
-     * pelo botão do LMS nem pelo add_to_cart estando logado.
+     * Ensure a pending enrollment exists even when the order is created without using the LMS CTA.
      */
     public static function handle_order_processed($order_id, $posted_data, $order)
     {
@@ -73,7 +74,7 @@ class PRESS_LMS_Woo
     }
 
     /**
-     * Ativa a matrícula quando o pedido estiver pago/processado.
+     * Activate the enrollment when payment is confirmed.
      */
     public static function handle_order_completed($order_id)
     {
@@ -102,19 +103,19 @@ class PRESS_LMS_Woo
     }
 
     /**
-     * Resolve qual curso pertence a um produto Woo.
+     * Resolve the course linked to a WooCommerce product.
      */
     private static function get_course_id_from_product_id(int $product_id): int
     {
         if ($product_id <= 0) return 0;
 
-        // Preferencial: produto guarda course_id
+        // Prefer the product-level course reference when it exists.
         $course_id = (int) get_post_meta($product_id, '_press_course_id', true);
         if ($course_id > 0) {
             return $course_id;
         }
 
-        // Fallback: achar curso pelo meta _press_course_product_id
+        // Fall back to the course-level product reference.
         $q = new WP_Query([
             'post_type'      => 'press_course',
             'post_status'    => 'publish',
@@ -131,6 +132,17 @@ class PRESS_LMS_Woo
         return 0;
     }
 
+    private static function get_course_url_from_product_id(int $product_id): string
+    {
+        $course_id = self::get_course_id_from_product_id($product_id);
+        if ($course_id <= 0) {
+            return '';
+        }
+
+        $course_url = get_permalink($course_id);
+        return $course_url ? (string) $course_url : '';
+    }
+
     private static function woo_active()
     {
         return class_exists('WooCommerce') && class_exists('WC_Product_Simple');
@@ -142,7 +154,7 @@ class PRESS_LMS_Woo
         if (wp_is_post_revision($post_id)) return;
         if (!current_user_can('edit_post', $post_id)) return;
 
-        // Só quando estiver publicado
+        // Only sync purchasable products for published courses.
         if ($post->post_status !== 'publish') return;
 
         if (!self::woo_active()) return;
@@ -157,7 +169,7 @@ class PRESS_LMS_Woo
             return;
         }
 
-        // Se não tem preço ainda, não cria
+        // Skip product creation until a valid price exists.
         if ((float)$price <= 0) return;
 
         if ($existing_product_id > 0 && get_post($existing_product_id)) {
@@ -178,20 +190,21 @@ class PRESS_LMS_Woo
         $product->set_name($course_post->post_title);
         $product->set_status('publish');
         $product->set_catalog_visibility('visible');
+        $product->set_sold_individually(true);
 
-        // Curso é serviço digital
+        // Courses behave as virtual, non-downloadable products.
         $product->set_virtual(true);
         $product->set_downloadable(false);
 
         $product->set_regular_price($price);
 
-        // SKU
+        // Use a deterministic SKU so the product can be located easily.
         $product->set_sku('PRESS-COURSE-' . $course_id);
 
-        // Linkar produto -> curso
+        // Store the course reference on the WooCommerce product.
         $product->update_meta_data('_press_course_id', $course_id);
 
-        // Thumbnail do curso
+        // Reuse the course featured image as the product thumbnail.
         $thumb_id = get_post_thumbnail_id($course_id);
         if ($thumb_id) {
             $product->set_image_id($thumb_id);
@@ -215,6 +228,7 @@ class PRESS_LMS_Woo
         $product->set_name($course_post->post_title);
         $product->set_status('publish');
         $product->set_catalog_visibility('visible');
+        $product->set_sold_individually(true);
         $product->set_regular_price($price);
 
         $thumb_id = get_post_thumbnail_id($course_id);
@@ -265,5 +279,123 @@ class PRESS_LMS_Woo
         }
 
         return $is_purchasable;
+    }
+
+    public static function filter_is_sold_individually($sold_individually, $product)
+    {
+        if (!$product instanceof WC_Product) {
+            return $sold_individually;
+        }
+
+        return self::get_course_id_from_product_id((int) $product->get_id()) > 0
+            ? true
+            : $sold_individually;
+    }
+
+    public static function validate_add_to_cart($passed, $product_id, $quantity, $variation_id, $variations, $cart_item_data)
+    {
+        $course_id = self::get_course_id_from_product_id((int) $product_id);
+        if ($course_id <= 0) {
+            return $passed;
+        }
+
+        if ((int) $quantity > 1) {
+            wc_add_notice('Cursos só podem ser adicionados uma vez ao carrinho.', 'error');
+            return false;
+        }
+
+        if (function_exists('WC') && WC()->cart) {
+            foreach (WC()->cart->get_cart() as $cart_item) {
+                if ((int) ($cart_item['product_id'] ?? 0) === (int) $product_id) {
+                    wc_add_notice('Este curso já está no carrinho.', 'notice');
+                    return false;
+                }
+            }
+        }
+
+        return $passed;
+    }
+
+    public static function normalize_course_cart_quantities($cart): void
+    {
+        if (!is_object($cart) || !method_exists($cart, 'get_cart')) {
+            return;
+        }
+
+        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+            $product_id = (int) ($cart_item['product_id'] ?? 0);
+            if ($product_id <= 0) {
+                continue;
+            }
+
+            if (self::get_course_id_from_product_id($product_id) <= 0) {
+                continue;
+            }
+
+            if ((int) ($cart_item['quantity'] ?? 1) > 1) {
+                $cart->set_quantity($cart_item_key, 1, false);
+            }
+        }
+    }
+
+    public static function filter_loop_add_to_cart_link($html, $product, $args)
+    {
+        if (!$product instanceof WC_Product) {
+            return $html;
+        }
+
+        $course_url = self::get_course_url_from_product_id((int) $product->get_id());
+        if ($course_url === '') {
+            return $html;
+        }
+
+        $class_name = 'button';
+        if (is_array($args) && !empty($args['class'])) {
+            $class_name = (string) $args['class'];
+        }
+
+        return sprintf(
+            '<a href="%s" class="%s">%s</a>',
+            esc_url($course_url),
+            esc_attr($class_name),
+            esc_html__('Ver curso', 'pressplay-lms')
+        );
+    }
+
+    public static function maybe_swap_single_product_button(): void
+    {
+        if (!function_exists('is_product') || !is_product()) {
+            return;
+        }
+
+        $product_id = get_the_ID();
+        if (!$product_id || self::get_course_id_from_product_id((int) $product_id) <= 0) {
+            return;
+        }
+
+        remove_action('woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30);
+        add_action('woocommerce_single_product_summary', [__CLASS__, 'render_single_view_course_button'], 30);
+    }
+
+    public static function render_single_view_course_button(): void
+    {
+        global $product;
+
+        if (!$product instanceof WC_Product) {
+            $product = wc_get_product(get_the_ID());
+        }
+
+        if (!$product instanceof WC_Product) {
+            return;
+        }
+
+        $course_url = self::get_course_url_from_product_id((int) $product->get_id());
+        if ($course_url === '') {
+            return;
+        }
+
+        echo '<p class="presslms-product-course-link">';
+        echo '<a class="button alt" href="' . esc_url($course_url) . '">Ver curso</a>';
+        echo '</p>';
     }
 }

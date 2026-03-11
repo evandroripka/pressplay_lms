@@ -3,33 +3,56 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Rewrite
 {
+    private static function get_request_path(): string
+    {
+        $path = (string) wp_parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+        $home_path = (string) wp_parse_url(home_url('/'), PHP_URL_PATH);
+
+        if ($home_path && $home_path !== '/' && str_starts_with($path, $home_path)) {
+            $path = (string) substr($path, strlen($home_path));
+        }
+
+        return trim($path, '/');
+    }
+
     public static function init()
     {
         add_action('init', [__CLASS__, 'add_rules']);
         add_filter('query_vars', [__CLASS__, 'query_vars']);
-        add_action('template_redirect', [__CLASS__, 'template_router']);
+        add_filter('redirect_canonical', [__CLASS__, 'filter_canonical_redirect'], 10, 2);
+        add_action('template_redirect', [__CLASS__, 'template_router'], 0);
     }
 
     public static function add_rules()
     {
-        // Rota do curso: /curso/{slug}
+        // Course route: /curso/{slug}
         add_rewrite_rule(
             '^curso/([^/]+)/?$',
             'index.php?press_course_slug=$matches[1]',
             'top'
         );
 
-        // Página de aulas: /curso/{curso}/aula/{aula}
+        // Lesson route: /curso/{course}/aula/{lesson}
         add_rewrite_rule(
             '^curso/([^/]+)/aula/([^/]+)/?$',
             'index.php?press_course_slug=$matches[1]&press_lesson_slug=$matches[2]',
             'top'
         );
 
-        // Meus cursos: /meus-cursos
+        // Student dashboard route: /meus-cursos
         add_rewrite_rule('^meus-cursos/?$', 'index.php?press_my_courses=1', 'top');
 
-        // Cadastro: /cadastro
+        // Student certificate route: /meus-cursos/certificado/{course}
+        add_rewrite_rule(
+            '^meus-cursos/certificado/([^/]+)/?$',
+            'index.php?press_student_certificate=$matches[1]',
+            'top'
+        );
+
+        // Public LMS catalog route: /cursos
+        add_rewrite_rule('^cursos/?$', 'index.php?press_course_archive=1', 'top');
+
+        // Registration route: /cadastro
         add_rewrite_rule('^cadastro/?$', 'index.php?press_register=1', 'top');
     }
 
@@ -38,37 +61,93 @@ class PRESS_LMS_Rewrite
         $vars[] = 'press_course_slug';
         $vars[] = 'press_lesson_slug';
         $vars[] = 'press_my_courses';
+        $vars[] = 'press_student_certificate';
+        $vars[] = 'press_course_archive';
         $vars[] = 'press_register';
         return $vars;
     }
 
     public static function template_router()
     {
-        $course_slug = get_query_var('press_course_slug');
-        $lesson_slug = get_query_var('press_lesson_slug');
+        $course_slug = sanitize_title((string) get_query_var('press_course_slug'));
+        $lesson_slug = sanitize_title((string) get_query_var('press_lesson_slug'));
+        $student_certificate = sanitize_title((string) get_query_var('press_student_certificate'));
+        $my_courses = (bool) get_query_var('press_my_courses');
+        $course_archive = (bool) get_query_var('press_course_archive');
+        $register = (bool) get_query_var('press_register');
 
-        // 1) Aula de curso
+        $request_path = self::get_request_path();
+
+        if ($request_path !== '') {
+            if ($student_certificate === '' && preg_match('#^meus-cursos/certificado/([^/]+)/?$#', $request_path, $matches)) {
+                $student_certificate = sanitize_title($matches[1]);
+            }
+
+            if (!$course_archive && preg_match('#^cursos/?$#', $request_path)) {
+                $course_archive = true;
+            }
+
+            if ($course_slug === '' && preg_match('#^curso/([^/]+)/aula/([^/]+)/?$#', $request_path, $matches)) {
+                $course_slug = sanitize_title($matches[1]);
+                $lesson_slug = sanitize_title($matches[2]);
+            } elseif ($course_slug === '' && preg_match('#^curso/([^/]+)/?$#', $request_path, $matches)) {
+                $course_slug = sanitize_title($matches[1]);
+            }
+
+            if (!$my_courses && preg_match('#^meus-cursos/?$#', $request_path)) {
+                $my_courses = true;
+            }
+
+            if (!$register && preg_match('#^cadastro/?$#', $request_path)) {
+                $register = true;
+            }
+        }
+
+        // 1) Lesson page
         if ($course_slug && $lesson_slug) {
             PRESS_LMS_Frontend::render_lesson_by_slug($course_slug, $lesson_slug);
             exit;
         }
 
-        // 2) Página de curso
+        // 2) Course page
         if ($course_slug && !$lesson_slug) {
             PRESS_LMS_Frontend::render_course_by_slug($course_slug);
             exit;
         }
 
-        // 3) Meus Cursos
-        if (get_query_var('press_my_courses')) {
+        // 3) Student certificate
+        if ($student_certificate) {
+            PRESS_LMS_Frontend::render_student_certificate_by_slug($student_certificate);
+            exit;
+        }
+
+        // 4) Course catalog
+        if ($course_archive) {
+            PRESS_LMS_Frontend::render_course_archive();
+            exit;
+        }
+
+        // 5) Student dashboard
+        if ($my_courses) {
             PRESS_LMS_Frontend::render_my_courses();
             exit;
         }
 
-        // 4) Cadastro
-        if (get_query_var('press_register')) {
+        // 6) Registration
+        if ($register) {
             PRESS_LMS_Frontend::render_register();
             exit;
         }
+    }
+
+    public static function filter_canonical_redirect($redirect_url, $requested_url)
+    {
+        $path = self::get_request_path();
+
+        if ($path !== '' && preg_match('#^(curso/[^/]+(?:/aula/[^/]+)?|meus-cursos(?:/certificado/[^/]+)?|cursos|cadastro)/?$#', $path)) {
+            return false;
+        }
+
+        return $redirect_url;
     }
 }

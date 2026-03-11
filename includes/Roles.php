@@ -17,6 +17,12 @@ class PRESS_LMS_Roles {
         if (!is_user_logged_in()) return;
         $user = wp_get_current_user();
         if (in_array('press_student', (array)$user->roles, true)) {
+            global $pagenow;
+
+            if ($pagenow === 'admin-post.php') {
+                return;
+            }
+
             if (is_admin() && !wp_doing_ajax()) {
                 wp_safe_redirect(home_url('/meus-cursos'));
                 exit;

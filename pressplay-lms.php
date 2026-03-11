@@ -2,7 +2,7 @@
 
 /**
  * Plugin Name: Pressplay LMS
- * Description: LMS enxuto para cursos (Vimeo), matrícula, progresso e certificado.
+ * Description: WordPress LMS for courses, lessons, enrollments, progress tracking, and certificates.
  * Version: 1.0.0
  * Author: Evandro Ripkas
  * Author URI: https://evandroripka.dev
@@ -14,13 +14,13 @@
 
 if (!defined('ABSPATH')) exit;
 
-// ✅ Constantes padrão
+// Core plugin constants.
 define('PRESS_LMS_VERSION', '1.0.0');
 define('PRESS_LMS_FILE', __FILE__);
 define('PRESS_LMS_PATH', plugin_dir_path(__FILE__));
 define('PRESS_LMS_URL', plugin_dir_url(__FILE__));
 
-// Includes
+// Bootstrap dependencies.
 require_once PRESS_LMS_PATH . 'includes/Materials.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Dependencies.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Activator.php';

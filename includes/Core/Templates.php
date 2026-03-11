@@ -10,13 +10,13 @@ class PRESS_LMS_Templates
 
     public static function template_include($template)
     {
-        // Se for um single do CPT press_course, força template do plugin
+        // Use the plugin template for course singles.
         if (is_singular('press_course')) {
             $plugin_template = PRESS_LMS_PATH . 'templates/frontend/single-press_course.php';
             if (file_exists($plugin_template)) return $plugin_template;
         }
 
-        // Se for um single do CPT press_lesson
+        // Use the plugin template for lesson singles.
         if (is_singular('press_lesson')) {
             $plugin_template = PRESS_LMS_PATH . 'templates/frontend/single-press_lesson.php';
             if (file_exists($plugin_template)) return $plugin_template;

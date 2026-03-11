@@ -7,7 +7,7 @@ class PRESS_LMS_Mailer {
         $user = get_user_by('id', $user_id);
         if (!$user) return false;
 
-        // gera link de reset padrão do WP
+        // Reuse the default WordPress password reset flow.
         $key = get_password_reset_key($user);
         if (is_wp_error($key)) return false;
 
@@ -42,7 +42,7 @@ class PRESS_LMS_Mailer {
         $reset = esc_url($data['reset_url']);
         $logo  = $data['logo_url'];
 
-        // Você disse que vai fazer o CSS do corpo do e-mail: então deixei bem “templateável”
+        // Keep the markup self-contained so the email can be restyled later without changing logic.
         $logo_html = $logo ? '<img src="'.esc_url($logo).'" alt="'.$brand.'" style="max-width:160px;height:auto;display:block;margin:0 auto 16px;">' : '';
 
         return '

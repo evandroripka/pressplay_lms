@@ -10,47 +10,47 @@ class PRESS_LMS_Actions
 
         add_action('admin_post_press_lms_enroll_continue', [__CLASS__, 'handle_enroll_continue']);
         add_action('admin_post_nopriv_press_lms_enroll_continue', [__CLASS__, 'handle_enroll_continue']);
+        add_action('admin_post_press_lms_update_account_password', [__CLASS__, 'handle_account_password_update']);
         add_action('wp_ajax_press_lms_track_progress', [__CLASS__, 'ajax_track_progress']);
-        // Faz o WooCommerce respeitar redirect_to no login/registro
+        // Preserve redirect_to values across WooCommerce login and registration.
         add_filter('woocommerce_login_redirect', [__CLASS__, 'woo_login_redirect'], 10, 2);
         add_filter('woocommerce_registration_redirect', [__CLASS__, 'woo_registration_redirect'], 10, 1);
+        add_filter('login_redirect', [__CLASS__, 'default_login_redirect'], 10, 3);
         add_action('wp_ajax_press_lms_change_student_password', [__CLASS__, 'ajax_change_student_password']);
         add_action('save_post_press_lesson', function ($post_id, $post, $update) {
 
-            // Segurança básica
+            // Ignore autosaves, revisions, and invalid post objects.
             if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) return;
             if (!$post || !($post instanceof WP_Post)) return;
 
             $post_id = (int) $post_id;
 
-            // Só quando for publish (evita calcular em rascunho/auto-draft)
+            // Refresh lesson metadata only for published lessons.
             if ($post->post_status !== 'publish') return;
 
-            // Evita rodar em update em massa rápido / loops (rate limit simples)
-            // Ex.: se salvar 10x seguidos, não fica batendo no Vimeo.
+            // Rate-limit the Vimeo sync to avoid burst saves or loops.
             $rate_key = 'presslms_vimeo_duration_lock_' . $post_id;
             if (get_transient($rate_key)) {
-                // Mesmo com lock, ainda recalcula total do curso se já tiver duration salva (opcional)
+                // Still recalculate course totals even when the API sync is skipped.
                 $course_id = (int) get_post_meta($post_id, '_press_lesson_course_id', true);
                 if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
                     PRESSLMS_Duration::recalc_course_total_duration($course_id);
                 }
                 return;
             }
-            set_transient($rate_key, 1, 30); // 30s de cooldown
+            set_transient($rate_key, 1, 30); // 30-second cooldown.
 
-            // Curso vinculado
+            // Resolve the linked course.
             $course_id = (int) get_post_meta($post_id, '_press_lesson_course_id', true);
 
-            // Vimeo id
+            // Read the current Vimeo metadata cache.
             $vimeo_id = (int) get_post_meta($post_id, '_press_lesson_vimeo_id', true);
 
-            // Cache local
             $cached_vimeo_id   = (int) get_post_meta($post_id, '_press_lesson_vimeo_id_cached', true);
             $cached_modified   = (string) get_post_meta($post_id, '_press_lesson_vimeo_modified_cached', true);
             $current_duration  = (int) get_post_meta($post_id, '_press_lesson_duration', true);
 
-            // Se não tem Vimeo -> zera duration + recalcula curso
+            // Reset duration data when the lesson no longer points to Vimeo.
             if ($vimeo_id <= 0) {
                 update_post_meta($post_id, '_press_lesson_duration', 0);
                 update_post_meta($post_id, '_press_lesson_vimeo_id_cached', 0);
@@ -62,16 +62,14 @@ class PRESS_LMS_Actions
                 return;
             }
 
-            // Decide se precisa bater na API
+            // Decide whether the remote Vimeo payload needs to be refreshed.
             $need_refresh = false;
 
-            // Mudou o vídeo
             if ($cached_vimeo_id !== $vimeo_id) $need_refresh = true;
 
-            // Ainda não tem duration
             if ($current_duration <= 0) $need_refresh = true;
 
-            // Se tem token e Vimeo class, checa modified_time (só quando necessário)
+            // Use modified_time when a token is available to invalidate caches safely.
             if (!$need_refresh && class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'has_token') && PRESS_LMS_Vimeo::has_token()) {
                 if (method_exists('PRESS_LMS_Vimeo', 'get_video_modified_time')) {
                     $remote_modified = PRESS_LMS_Vimeo::get_video_modified_time($vimeo_id);
@@ -81,7 +79,7 @@ class PRESS_LMS_Actions
                 }
             }
 
-            // Atualiza duration via API
+            // Refresh duration and remote metadata through the Vimeo API.
             if ($need_refresh && class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'has_token') && PRESS_LMS_Vimeo::has_token()) {
 
                 $duration = 0;
@@ -98,11 +96,10 @@ class PRESS_LMS_Actions
                 update_post_meta($post_id, '_press_lesson_vimeo_id_cached', $vimeo_id);
                 update_post_meta($post_id, '_press_lesson_vimeo_modified_cached', $remote_modified);
             } else {
-                // Sem token = não dá pra buscar; mantém duration atual e só recalcula curso
-                // (pelo menos não quebra)
+                // Without a token, keep the local duration and only recalculate totals.
             }
 
-            // Recalcula total do curso
+            // Always refresh the total course duration after lesson updates.
             if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
                 PRESSLMS_Duration::recalc_course_total_duration($course_id);
             }
@@ -175,15 +172,73 @@ class PRESS_LMS_Actions
             wp_send_json_error(['message' => 'A senha deve ter pelo menos 6 caracteres.'], 400);
         }
 
-        // Usa o core do WordPress para garantir compatibilidade
+        // Use the WordPress password API for compatibility with the current auth stack.
         wp_set_password($new_password, $user_id);
 
         wp_send_json_success([
             'message' => 'Senha alterada com sucesso.'
         ]);
     }
+
+    private static function get_student_dashboard_url(array $args = []): string
+    {
+        $base_url = home_url('/meus-cursos/');
+        return !empty($args) ? add_query_arg($args, $base_url) : $base_url;
+    }
+
+    public static function handle_account_password_update()
+    {
+        if (!is_user_logged_in()) {
+            wp_safe_redirect(self::get_student_dashboard_url());
+            exit;
+        }
+
+        $user_id = get_current_user_id();
+        $redirect_tab = isset($_POST['redirect_tab']) ? sanitize_key((string) $_POST['redirect_tab']) : 'profile';
+        $redirect_args = ['tab' => $redirect_tab];
+
+        if (
+            !isset($_POST['press_lms_account_password_nonce']) ||
+            !wp_verify_nonce($_POST['press_lms_account_password_nonce'], 'press_lms_update_account_password')
+        ) {
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_nonce_invalid']));
+            exit;
+        }
+
+        $current_password = isset($_POST['current_password']) ? (string) wp_unslash($_POST['current_password']) : '';
+        $new_password = isset($_POST['new_password']) ? (string) wp_unslash($_POST['new_password']) : '';
+        $confirm_password = isset($_POST['confirm_password']) ? (string) wp_unslash($_POST['confirm_password']) : '';
+
+        $user = get_userdata($user_id);
+        if (!$user) {
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_user_invalid']));
+            exit;
+        }
+
+        if ($current_password === '' || !wp_check_password($current_password, $user->user_pass, $user_id)) {
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_current_invalid']));
+            exit;
+        }
+
+        if (strlen(trim($new_password)) < 6) {
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_too_short']));
+            exit;
+        }
+
+        if ($new_password !== $confirm_password) {
+            wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_mismatch']));
+            exit;
+        }
+
+        wp_set_password($new_password, $user_id);
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id, true);
+
+        wp_safe_redirect(self::get_student_dashboard_url($redirect_args + ['notice' => 'password_updated']));
+        exit;
+    }
     /**
-     * Clique no botão "Matricular"
+     * Handle the main LMS enrollment CTA.
      */
     public static function handle_enroll()
     {
@@ -205,7 +260,7 @@ class PRESS_LMS_Actions
             wp_die('WooCommerce é obrigatório para matrícula.');
         }
 
-        // Se não logado: manda pro My Account do Woo + redirect_to para continuar matrícula
+        // Unauthenticated users must go through account login or registration first.
         if (!is_user_logged_in()) {
             $myaccount = wc_get_page_permalink('myaccount');
 
@@ -215,7 +270,7 @@ class PRESS_LMS_Actions
                 '_wpnonce'  => wp_create_nonce('press_lms_enroll_continue_' . $course_id),
             ], admin_url('admin-post.php'));
 
-            // IMPORTANTÍSSIMO: não duplo-encode. Só valida depois.
+            // Keep the redirect URL raw so WooCommerce can preserve it correctly.
             $target = add_query_arg([
                 'redirect_to' => $continue_url,
             ], $myaccount);
@@ -224,12 +279,12 @@ class PRESS_LMS_Actions
             exit;
         }
 
-        // Se já logado, vai direto pro checkout
+        // Logged-in users can continue directly to checkout.
         self::do_enroll_and_redirect_to_checkout(get_current_user_id(), $course_id);
     }
 
     /**
-     * Endpoint chamado após login/registro no Woo (via redirect_to)
+     * Resume the enrollment flow after WooCommerce login or registration.
      */
     public static function handle_enroll_continue()
     {
@@ -248,7 +303,7 @@ class PRESS_LMS_Actions
         }
 
         if (!is_user_logged_in()) {
-            // ainda não logou, manda pra minha conta
+            // If the customer is still unauthenticated, return to My Account.
             if (class_exists('WooCommerce') && function_exists('wc_get_page_permalink')) {
                 wp_safe_redirect(wc_get_page_permalink('myaccount'));
                 exit;
@@ -260,7 +315,7 @@ class PRESS_LMS_Actions
     }
 
     /**
-     * Garante que Woo cart/session existe mesmo no admin-post.php
+     * Bootstrap the WooCommerce cart/session inside admin-post requests when needed.
      */
     private static function ensure_woo_cart_ready()
     {
@@ -268,12 +323,12 @@ class PRESS_LMS_Actions
 
         $wc = WC();
 
-        // Carrega includes de frontend quando estamos fora do fluxo normal do Woo
+        // Load WooCommerce frontend helpers when the request bypasses the normal frontend flow.
         if (method_exists($wc, 'frontend_includes')) {
             $wc->frontend_includes();
         }
 
-        // Inicializa sessão/carrinho
+        // Initialize the WooCommerce session and cart.
         if (method_exists($wc, 'initialize_session')) {
             $wc->initialize_session();
         }
@@ -281,7 +336,7 @@ class PRESS_LMS_Actions
             $wc->initialize_cart();
         }
 
-        // Fallback extra (algumas instalações precisam disso)
+        // Some installations require an explicit cart bootstrap call.
         if (function_exists('wc_load_cart')) {
             wc_load_cart();
         }
@@ -297,7 +352,7 @@ class PRESS_LMS_Actions
             wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
         }
 
-        // matrícula pending
+        // Create the pending enrollment before checkout.
         PRESS_LMS_Enrollments::get_or_create_pending((int)$user_id, (int)$course_id, 'woocommerce');
 
         $product_id = PRESS_LMS_Enrollments::get_course_product_id((int)$course_id);
@@ -311,7 +366,7 @@ class PRESS_LMS_Actions
             wp_die('Carrinho WooCommerce não inicializado.');
         }
 
-        // Evita checkout com itens aleatórios
+        // Replace cart contents so checkout contains only the selected course.
         WC()->cart->empty_cart();
         WC()->cart->add_to_cart((int)$product_id, 1);
 
@@ -320,7 +375,7 @@ class PRESS_LMS_Actions
     }
 
     /**
-     * Faz o Woo respeitar redirect_to no login.
+     * Make WooCommerce honor redirect_to during login.
      */
     public static function woo_login_redirect($redirect, $user)
     {
@@ -329,11 +384,12 @@ class PRESS_LMS_Actions
             $safe = wp_validate_redirect($requested, $redirect);
             return $safe;
         }
-        return $redirect;
+
+        return self::default_dashboard_redirect_for_user($user, $redirect);
     }
 
     /**
-     * Faz o Woo respeitar redirect_to no registro.
+     * Make WooCommerce honor redirect_to during registration.
      */
     public static function woo_registration_redirect($redirect)
     {
@@ -342,6 +398,43 @@ class PRESS_LMS_Actions
             $safe = wp_validate_redirect($requested, $redirect);
             return $safe;
         }
-        return $redirect;
+
+        $user = wp_get_current_user();
+        return self::default_dashboard_redirect_for_user($user, $redirect);
+    }
+
+    public static function default_login_redirect($redirect_to, $requested_redirect_to, $user)
+    {
+        if (!empty($requested_redirect_to)) {
+            return $redirect_to;
+        }
+
+        return self::default_dashboard_redirect_for_user($user, $redirect_to);
+    }
+
+    private static function default_dashboard_redirect_for_user($user, string $fallback): string
+    {
+        if (is_wp_error($user) || !$user instanceof WP_User) {
+            return $fallback;
+        }
+
+        if (user_can($user, 'manage_options')) {
+            return $fallback;
+        }
+
+        $roles = (array) $user->roles;
+        if (in_array('press_student', $roles, true)) {
+            return home_url('/meus-cursos/');
+        }
+
+        if (
+            class_exists('PRESS_LMS_Enrollments') &&
+            method_exists('PRESS_LMS_Enrollments', 'get_active_enrollments') &&
+            !empty(PRESS_LMS_Enrollments::get_active_enrollments((int) $user->ID))
+        ) {
+            return home_url('/meus-cursos/');
+        }
+
+        return $fallback;
     }
 }

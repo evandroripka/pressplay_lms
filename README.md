@@ -1,131 +1,115 @@
 # Pressplay LMS
 
-Plugin LMS para WordPress com foco em cursos em video, controle de acesso, integracao com WooCommerce e fluxo de matricula automatizado.
+Pressplay LMS is a WordPress plugin for selling and delivering online courses with a custom student experience inside WordPress.
 
-O projeto foi construido para cenarios reais de venda de cursos no mercado brasileiro, com frontend proprio, progresso por aula, certificados e estrutura extensivel para continuar evoluindo.
+## Current scope
 
-## Estado atual
+The plugin currently covers these areas:
 
-Versao atual do plugin: `1.0.0`
+- course, lesson, and teacher management
+- WooCommerce product synchronization for courses
+- enrollment creation and activation
+- protected course and lesson access
+- lesson progress tracking
+- certificate generation after completion
+- student dashboard and profile actions
+- custom frontend pages for course, lesson, student dashboard, registration, and course catalog
 
-O plugin ja cobre o fluxo principal de:
+## Main features
 
-- cadastro de cursos, aulas e professores
-- venda do curso via WooCommerce
-- criacao e ativacao de matriculas
-- controle de acesso a curso e aula
-- progresso por aula
-- certificado ao concluir o curso
-- area administrativa para configuracoes e alunos
+### Course and lesson model
 
-## Funcionalidades principais
+- Custom post type `press_course` for courses
+- Custom post type `press_lesson` for lessons
+- Custom post type `press_teacher` for teachers
+- Course-to-lesson relationship stored through `post_parent` and `_press_lesson_course_id`
+- Lesson creation and editing routed from the course editor
+- Course editor organized in tabs for settings, certificate, features, and lessons
 
-### Cursos e aulas
+### Frontend routes
 
-- CPT `press_course` para cursos
-- CPT `press_lesson` para aulas
-- CPT `press_teacher` para professores
-- relacionamento curso -> aula por `post_parent` e meta `_press_lesson_course_id`
-- pagina de curso em rota propria: `/curso/{slug}`
-- pagina de aula em rota propria: `/curso/{curso}/aula/{aula}`
-- criacao e edicao de aulas a partir da tela do curso
-- ordenacao de aulas via `menu_order`
+The plugin uses custom frontend routes instead of relying only on native single templates:
 
-### Frontend proprio
+- `/curso/{course-slug}`
+- `/curso/{course-slug}/aula/{lesson-slug}`
+- `/meus-cursos`
+- `/cadastro`
+- `/cursos`
 
-- templates customizados para curso e aula
-- breadcrumbs e navegacao entre curso e aulas
-- layout proprio com CSS dedicado
-- pagina de cadastro em `/cadastro`
-- pagina de meus cursos em `/meus-cursos`
-- renderizacao independente do tema para o fluxo principal do LMS
+The student certificate flow is available from the student dashboard and resolves through the frontend instead of the WordPress admin.
 
-### Videos, materiais e duracao
+### Student dashboard
 
-- suporte a Vimeo e YouTube por URL
-- validacao de Vimeo via API quando o token esta configurado
-- sync de duracao da aula via Vimeo
-- recalculo automatico da duracao total do curso
-- materiais por aula com anexos ou links
-- icones por tipo de material
+The student area currently includes:
 
-### Matriculas e acesso
+- active course library
+- progress summary
+- certificate list
+- certificate reissue links
+- account summary
+- password change form
 
-- role custom `press_student`
-- bloqueio do wp-admin para alunos
-- controle de acesso por matricula ativa
-- expiracao de matricula
-- bypass para administradores
-- criacao de matricula `pending` no fluxo de checkout
-- ativacao automatica ao pagamento/processamento do pedido
+Login redirects for students and enrolled users point to `/meus-cursos` by default when no explicit redirect target is present.
 
-### WooCommerce
+### Access and enrollment flow
 
-- criacao automatica de produto ao publicar o curso com preco
-- sincronizacao do produto com o curso
-- checkout direcionado pelo plugin
-- suporte ao fluxo de login/registro antes da matricula
-- ligacao produto -> curso por meta `_press_course_id`
+- Student role `press_student`
+- Admin area blocked for student accounts
+- Enrollment statuses managed in a custom table
+- Pending enrollment created before checkout
+- Enrollment activated after WooCommerce order processing/completion
+- Course pause mode blocks new enrollments while preserving access for enrolled students
 
-### Alunos, progresso e certificado
+### WooCommerce integration
 
-- shortcode `[press_register]` para cadastro customizado
-- perfil do aluno salvo em tabela propria
-- e-mail com link para definir senha
-- progresso salvo por aula em tabela propria
-- percentual de conclusao do curso
-- certificado com placeholders personalizados
-- preview e download de certificado no admin
+- A WooCommerce product is created or updated from the course editor
+- Course products are sold individually
+- Duplicate quantities are prevented in the cart
+- Product visibility is adjusted when a course is paused
+- WooCommerce loop and single product buttons can link back to the course page
 
-### Configuracoes e operacao
+### Video, duration, and materials
 
-- menu administrativo do Pressplay LMS
-- pagina de configuracoes da marca e Vimeo
-- pagina administrativa de alunos
-- aviso de dependencias obrigatorias e recomendadas
-- opcao para apagar dados ao desinstalar
+- Vimeo and YouTube URLs supported at lesson level
+- Vimeo API integration for validation, duration, and thumbnail data
+- Automatic course duration recalculation from published lessons
+- Lesson materials support attachments and external links
+- Material type detection with SVG icon mapping
 
-## Dependencias
+### Certificates
 
-Obrigatoria:
+- Certificate layout is configurable per course
+- Certificate placeholders include student name, course name, duration, completion date, description, logo, and signature
+- Certificate access is restricted to completed courses, except for administrators
 
-- WooCommerce
+## Database tables
 
-Recomendada:
-
-- Mercado Pago for WooCommerce
-
-Opcional:
-
-- Vimeo Access Token para validacao de videos e duracao automatica
-
-## Banco de dados
-
-O plugin cria as tabelas:
+The plugin manages these custom tables:
 
 - `wp_press_students`
 - `wp_press_enrollments`
 - `wp_press_progress`
 
-Essas tabelas armazenam:
+They are used for:
 
-- perfil complementar do aluno
-- matriculas e expiracao de acesso
-- progresso por aula e conclusao
+- extended student profile data
+- enrollment records and expiration windows
+- lesson progress and completion timestamps
 
-## Comportamento na ativacao
+## Activation behavior
 
-Ao ativar o plugin, ele:
+On activation, the plugin:
 
-- cria a role `press_student`
-- registra os CPTs
-- registra as rotas customizadas
-- executa `flush_rewrite_rules()`
-- habilita cadastro publico no WordPress
-- define `press_student` como role padrao
-- ajusta configuracoes importantes do WooCommerce para o fluxo de conta e checkout
+- runs database migrations
+- registers the student role
+- registers custom post types
+- registers frontend rewrite rules
+- enables public registration in WordPress
+- sets `press_student` as the default role when available
+- aligns core WooCommerce account settings with the LMS enrollment flow
+- flushes rewrite rules
 
-## Estrutura atual
+## Directory structure
 
 ```text
 pressplay-lms/
@@ -148,6 +132,7 @@ pressplay-lms/
 │   ├── CPT.php
 │   ├── CPT_Teacher.php
 │   ├── Certificate.php
+│   ├── Course_Lifecycle.php
 │   ├── Database.php
 │   ├── Duration.php
 │   ├── Enrollments.php
@@ -167,33 +152,34 @@ pressplay-lms/
 │   ├── frontend/
 │   └── panel/
 ├── pressplay-lms.php
-├── uninstall.php
 └── README.md
 ```
 
-## Organizacao do codigo
+## Architectural notes
 
-O plugin ainda nao segue MVC classico, de forma intencional.
+The plugin is currently organized by responsibility instead of a strict MVC structure.
 
-A organizacao atual esta baseada em modulos por responsabilidade, o que conversa melhor com WordPress:
+- `includes/Core`: bootstrap, activation, rewrite, assets, templates, and dependency checks
+- `includes/Support`: shared helpers
+- `includes/*.php`: domain and workflow modules
+- `templates/`: frontend and certificate rendering
+- `assets/`: CSS, JavaScript, and SVG resources
 
-- `Core/`: bootstrap, ativacao, rotas, assets, templates e dependencias
-- `Support/`: helpers compartilhados
-- `includes/*.php`: regras de negocio e modulos principais
-- `templates/`: renderizacao do frontend e certificado
-- `assets/`: estilos, scripts e icones
+This structure is intentionally incremental and keeps compatibility with WordPress plugin conventions while the codebase is being reorganized.
 
-Essa foi a primeira etapa de reorganizacao estrutural, sem alterar a logica de negocio central.
+## Dependencies
 
-## Proximos passos sugeridos
+Required:
 
-- quebrar classes muito grandes como `Frontend`, `Actions` e `Settings`
-- separar melhor `Admin`, `Frontend`, `Domain` e `Integrations`
-- introduzir autoload e namespaces
-- melhorar dashboard administrativo
-- expandir relatorios de alunos, matriculas e progresso
-- adicionar endpoints REST quando o dominio estiver mais desacoplado
+- WooCommerce
 
-## Licenca
+Optional:
 
-GPL v2 ou superior
+- Vimeo access token for API validation, duration sync, and thumbnails
+- Mercado Pago for WooCommerce when that payment gateway is needed
+
+## Notes for development
+
+- Custom routes depend on rewrite rules being registered correctly
+- Some student-facing flows intentionally bypass theme templates and render through the plugin
+- WooCommerce remains the source of truth for checkout and order status changes

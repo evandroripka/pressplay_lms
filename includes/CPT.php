@@ -21,7 +21,7 @@ class PRESS_LMS_CPT
             ],
             'public' => true,
             'show_ui' => true,
-            'show_in_menu' => 'press-lms', // aparece dentro do menu Pressplay LMS
+            'show_in_menu' => 'press-lms', // Register the post type under the LMS admin menu.
             'menu_icon' => 'dashicons-welcome-learn-more',
             'supports' => ['title', 'editor', 'thumbnail', 'page-attributes'],
             'rewrite' => ['slug' => 'curso', 'with_front' => false],
@@ -39,11 +39,11 @@ class PRESS_LMS_CPT
                 'edit_item' => 'Editar Aula',
                 'all_items' => 'Aulas',
             ],
-            'public' => false,     // não expõe publicamente por padrão
-            'show_ui' => true,     // mas aparece no admin
-            'show_in_menu' => false, // acesso à criação/edição deve partir da tela do curso
+            'public' => false,     // Frontend access is handled by custom routes.
+            'show_ui' => true,     // Keep lesson management available in the admin.
+            'show_in_menu' => false, // Lesson creation/editing should start from the course editor.
             'supports' => ['title', 'editor', 'thumbnail', 'page-attributes'],
-            'rewrite' => false,    // rota vai ser custom via Rewrite do plugin
+            'rewrite' => false,    // The lesson permalink is resolved by the plugin router.
         ]);
     }
 }

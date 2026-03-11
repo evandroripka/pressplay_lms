@@ -16,10 +16,10 @@ class PRESS_LMS_Settings
 
     public static function menu()
     {
-        // opção A: se você já tem PRESS_LMS_URL definido
+        // Use the bundled plugin icon when available.
         $icon_url = PRESS_LMS_URL . 'assets/pressplay_lms_logo.png';
 
-        // fallback seguro (opcional)
+        // Fall back to a Dashicon if the custom icon cannot be resolved.
         if (empty($icon_url)) {
             $icon_url = 'dashicons-welcome-learn-more';
         }
@@ -34,11 +34,11 @@ class PRESS_LMS_Settings
             6
         );
         add_submenu_page(
-            'press-lms', // menu pai = Pressplay LMS / Cursos
-            'Professores',                     // título da página
-            'Professores',                     // texto do menu
-            'edit_posts',                      // capability
-            'edit.php?post_type=press_teacher' // destino real
+            'press-lms', // Parent LMS menu slug.
+            'Professores', // Page title.
+            'Professores', // Menu label.
+            'edit_posts', // Required capability.
+            'edit.php?post_type=press_teacher' // Native teacher post type screen.
         );
         add_submenu_page(
             'press-lms',
@@ -57,25 +57,6 @@ class PRESS_LMS_Settings
             [__CLASS__, 'page_settings']
         );
 
-
-
-        /* add_submenu_page(
-            'press-lms',
-            'Matrículas',
-            'Matrículas',
-            'manage_options',
-            'press-lms-enrollments',
-            [__CLASS__, 'page_enrollments']
-        );
-
-        add_submenu_page(
-            'press-lms',
-            'Progresso',
-            'Progresso',
-            'manage_options',
-            'press-lms-progress',
-            [__CLASS__, 'page_progress']
-        ); */
     }
 
     public static function register()
@@ -86,7 +67,7 @@ class PRESS_LMS_Settings
             'default' => [],
         ]);
 
-        // Seções
+        // Settings sections.
         add_settings_section(
             'press_lms_section_brand',
             'Marca e E-mails',
@@ -106,7 +87,7 @@ class PRESS_LMS_Settings
             self::PAGE_SLUG
         );
 
-        // Campos
+        // Settings fields.
         add_settings_field(
             'brand_name',
             'Nome da marca',
@@ -146,13 +127,13 @@ class PRESS_LMS_Settings
         $output['brand_name'] = sanitize_text_field($input['brand_name'] ?? 'Pressplay');
         $output['email_logo_url'] = esc_url_raw($input['email_logo_url'] ?? '');
 
-        // Vimeo token: guarda como texto simples (vamos exibir como password field)
+        // Store the Vimeo token as plain text and mask it only at render time.
         $output['vimeo_token'] = trim(sanitize_text_field($input['vimeo_token'] ?? ''));
         $output['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']) ? 'yes' : 'no';
         return $output;
     }
 
-    // Helpers pra ler settings em qualquer lugar do plugin
+    // Shared settings accessor used across the plugin.
     public static function get($key, $default = null)
     {
         $all = get_option(self::OPTION_KEY, []);
@@ -221,7 +202,7 @@ class PRESS_LMS_Settings
         $postmeta_table    = $wpdb->postmeta;
         $users_table       = $wpdb->users;
 
-        // Filtros
+        // Admin filters.
         $filter_course = isset($_GET['course']) ? (int) $_GET['course'] : 0;
         $filter_status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
         $filter_search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
@@ -399,7 +380,7 @@ class PRESS_LMS_Settings
             return;
         }
 
-        // Bulma só nas telas internas do plugin
+        // Load Bulma only on LMS admin screens.
         wp_enqueue_style(
             'presslms-bulma',
             'https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css',

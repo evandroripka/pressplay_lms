@@ -12,16 +12,14 @@ class PRESS_LMS_Dependencies
     {
         if (!current_user_can('activate_plugins')) return;
 
-        // is_plugin_active fica aqui
+        // Load WordPress plugin helpers on demand.
         if (!function_exists('is_plugin_active')) {
             include_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
 
         $missing = [];
 
-        /**
-         * WooCommerce (obrigatório)
-         */
+        // WooCommerce is required for product, cart, and order handling.
         if (!class_exists('WooCommerce')) {
             $missing[] = [
                 'name' => 'WooCommerce',
@@ -31,10 +29,7 @@ class PRESS_LMS_Dependencies
             ];
         }
 
-        /**
-         * Mercado Pago for WooCommerce (recomendado)
-         * Detecção robusta por basename (arquivo principal do plugin)
-         */
+        // Mercado Pago is optional, but commonly used in this project.
         $mp_candidates = [
             'woocommerce-mercadopago/woocommerce-mercadopago.php',
             'woocommerce-mercadopago/mercadopago.php',
@@ -60,7 +55,7 @@ class PRESS_LMS_Dependencies
 
         if (empty($missing)) return;
 
-        // Se existir algum obrigatório faltando, erro. Se só recomendados, warning.
+        // Show an error when a required dependency is missing, otherwise use a warning notice.
         $has_required_missing = false;
         foreach ($missing as $p) {
             if (!empty($p['required'])) {

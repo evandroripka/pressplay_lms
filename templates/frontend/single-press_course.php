@@ -100,7 +100,9 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
             <div class="presslms-course-lessons">
               <?php foreach ($lessons as $idx => $lesson):
                 $lesson_url = home_url('/curso/' . $course_slug . '/aula/' . $lesson->post_name . '/');
-                $lesson_thumbnail_url = get_the_post_thumbnail_url($lesson->ID, 'medium_large') ?: $course_thumbnail_url;
+                $lesson_thumbnail_url = class_exists('PRESS_LMS_Helpers')
+                  ? PRESS_LMS_Helpers::get_lesson_thumbnail_url((int) $lesson->ID, (int) $course->ID, 'medium_large')
+                  : ($course_thumbnail_url ?: '');
                 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
                 $lesson_label = sprintf('Aula %02d', $idx + 1);
               ?>

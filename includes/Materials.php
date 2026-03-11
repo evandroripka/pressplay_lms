@@ -2,26 +2,20 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * PRESS_LMS_Materials
- *
- * Responsável por:
- * - Normalizar/validar itens de materiais (links/anexos)
- * - Detectar tipo (kind) com base em attachment_id/url
- * - Mapear ícones SVG por kind (assets/svg/*.svg)
+ * Normalize lesson materials, infer file types, and resolve SVG icons.
  */
 class PRESS_LMS_Materials
 {
     /**
-     * Se você chamou PRESS_LMS_Materials::init() no plugin principal,
-     * deixa isso aqui pra não dar fatal. (Hoje não precisa fazer nada.)
+     * Reserved for future hooks.
      */
     public static function init()
     {
-        // noop
+        // No runtime hooks are required for this helper today.
     }
 
     /**
-     * Mapa de ícones -> arquivo svg dentro de assets/svg/
+     * Map material kinds to SVG files in assets/svg.
      */
     private static function icon_map()
     {
@@ -29,7 +23,7 @@ class PRESS_LMS_Materials
             'pdf'         => 'pdf.svg',
             'excel'       => 'excel.svg',
             'word'        => 'word.svg',
-            'powerpoint'  => 'power point.svg', // seu arquivo tem espaço no nome (conforme seu print)
+            'powerpoint'  => 'power point.svg',
             'img'         => 'img.svg',
             'video'       => 'video.svg',
             'music'       => 'music.svg',
@@ -37,7 +31,6 @@ class PRESS_LMS_Materials
             '3d'          => '3d.svg',
             'txt'         => 'txt.svg',
 
-            // novo: links (www)
             'www'         => 'www.svg',
 
             'others'      => 'others.svg',
@@ -45,7 +38,7 @@ class PRESS_LMS_Materials
     }
 
     /**
-     * Extensões agrupadas por kind
+     * Group known file extensions by material kind.
      */
     private static function ext_map()
     {
@@ -69,7 +62,7 @@ class PRESS_LMS_Materials
     }
 
     /**
-     * Retorna URL do ícone SVG para o kind
+     * Return the SVG icon URL for a given material kind.
      */
     public static function get_icon_url($kind)
     {
@@ -82,8 +75,7 @@ class PRESS_LMS_Materials
     }
 
     /**
-     * Retorna HTML de <img> do ícone (ADMIN FRIENDLY)
-     * Isso evita o problema do SVG virar preto por sanitização/inline.
+     * Return an admin-safe SVG <img> tag instead of inline markup.
      */
     public static function get_icon_img_html($kind, $size = 22)
     {
@@ -97,16 +89,14 @@ class PRESS_LMS_Materials
     }
 
     /**
-     * Detecta o kind com base em attachment_id (preferência) ou url.
-     * Retorna:
-     * pdf|excel|word|powerpoint|img|video|music|zipado|3d|txt|www|others
+     * Detect the material kind from the attachment first, then from the URL.
      */
     public static function detect_kind($url = '', $attachment_id = 0)
     {
         $attachment_id = (int) $attachment_id;
         $url = trim((string)$url);
 
-        // 1) attachment primeiro
+        // Resolve the file type from the attachment when available.
         if ($attachment_id > 0) {
             $file = get_attached_file($attachment_id);
             if ($file) {
@@ -127,13 +117,13 @@ class PRESS_LMS_Materials
             }
         }
 
-        // 2) URL informado
+        // Fall back to the provided URL.
         if ($url !== '') {
             $ext = self::extract_extension_from_url($url);
             $kind = self::kind_from_extension($ext);
             if ($kind) return $kind;
 
-            // se é um link http(s) e não bateu extensão, assume www
+            // Treat generic HTTP(S) links as web resources.
             if (preg_match('~^https?://~i', $url)) {
                 return 'www';
             }
@@ -143,7 +133,7 @@ class PRESS_LMS_Materials
     }
 
     /**
-     * Normaliza e valida um array de materiais (v2)
+     * Normalize and validate the lesson materials array.
      */
     public static function normalize_items($items)
     {
@@ -192,9 +182,7 @@ class PRESS_LMS_Materials
         return array_values($out);
     }
 
-    // ==========================
-    // Helpers internos
-    // ==========================
+    // Internal helpers.
 
     private static function sanitize_kind($kind)
     {
@@ -216,7 +204,7 @@ class PRESS_LMS_Materials
 
         $map = self::ext_map();
 
-        // prioridade
+        // Keep the extension lookup order deterministic.
         foreach (['pdf','excel','word','powerpoint','img','video','music','zipado','3d','txt'] as $kind) {
             if (!empty($map[$kind]) && in_array($ext, $map[$kind], true)) {
                 return $kind;
@@ -240,7 +228,7 @@ class PRESS_LMS_Materials
         if (str_starts_with($mime, 'audio/')) return 'music';
         if (str_contains($mime, 'zip') || str_contains($mime, 'rar') || str_contains($mime, '7z')) return 'zipado';
 
-        // se for html/url, trata como www
+        // Treat HTML resources as generic web links.
         if (str_contains($mime, 'text/html')) return 'www';
 
         if (str_contains($mime, 'json') || str_contains($mime, 'xml') || str_contains($mime, 'text/plain')) return 'txt';

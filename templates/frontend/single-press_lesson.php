@@ -18,7 +18,8 @@ $materials_items = (array) get_post_meta($lesson->ID, '_press_lesson_materials_v
 if (class_exists('PRESS_LMS_Materials')) {
   $materials_items = PRESS_LMS_Materials::normalize_items($materials_items);
 }
-// duração por meta (vamos preencher via API depois)
+$course_thumbnail_url = get_the_post_thumbnail_url($course->ID, 'medium_large') ?: '';
+// Read the stored lesson duration from post meta.
 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
 $course_duration = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
 $course_url = home_url('/curso/' . $course_slug . '/');
@@ -48,12 +49,10 @@ $lesson_breadcrumb_label = $current_lesson_number > 0
   ? sprintf('Aula %02d', $current_lesson_number)
   : wp_html_excerpt($lesson->post_title, 26, '...');
 
-// =====================================================
-// Instrutor da aula
-// prioridade:
-// 1. professor definido na aula
-// 2. professor definido no curso
-// =====================================================
+// Resolve the lesson instructor.
+// Priority:
+// 1. teacher assigned directly to the lesson
+// 2. teacher assigned to the parent course
 $course_teacher_id = (int) get_post_meta($course->ID, '_press_course_teacher', true);
 $lesson_teacher_id = (int) get_post_meta($lesson->ID, '_press_lesson_teacher', true);
 
@@ -109,11 +108,6 @@ if (!function_exists('presslms_format_seconds')) {
   <div class="presslms__container">
     <header class="presslms-topbar">
       <div class="presslms-topbar__left">
-        <!--         <a class="presslms-back" href="<?php echo esc_url(home_url('/curso/' . $course_slug)); ?>">
-          <i class="fa-light fa-arrow-left-long"></i>
-          <span>Voltar para o curso</span>
-        </a>
- -->
         <div class="presslms-title">
           <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?></h1>
           <div class="presslms-meta">
@@ -324,9 +318,7 @@ if (!function_exists('presslms_format_seconds')) {
           </div>
 
           <?php
-          // ---------------------------------------------------------
-          // Sidebar: lista real de aulas do curso
-          // ---------------------------------------------------------
+          // Sidebar: render the real lesson list for the current course.
           $current_lesson_id = (int) $lesson->ID;
           ?>
 
@@ -337,10 +329,26 @@ if (!function_exists('presslms_format_seconds')) {
               <?php foreach ($lessons_list as $i => $l):
                 $url = home_url('/curso/' . $course_slug . '/aula/' . $l->post_name . '/');
                 $active = ((int)$l->ID === $current_lesson_id) ? ' is-active' : '';
+                $sidebar_thumb = class_exists('PRESS_LMS_Helpers')
+                  ? PRESS_LMS_Helpers::get_lesson_thumbnail_url((int) $l->ID, (int) $course->ID, 'medium')
+                  : ($course_thumbnail_url ?: '');
+                $sidebar_duration = (int) get_post_meta($l->ID, '_press_lesson_duration', true);
               ?>
                 <a class="presslms-lessons__item<?php echo esc_attr($active); ?>" href="<?php echo esc_url($url); ?>">
-                  <span><?php echo esc_html($i + 1); ?>.</span>
-                  <?php echo esc_html($l->post_title); ?>
+                  <span class="presslms-lessons__thumb" aria-hidden="true">
+                    <?php if ($sidebar_thumb): ?>
+                      <img src="<?php echo esc_url($sidebar_thumb); ?>" alt="" loading="lazy">
+                    <?php else: ?>
+                      <span class="presslms-lessons__thumb-placeholder"><?php echo esc_html($i + 1); ?></span>
+                    <?php endif; ?>
+                    <span class="presslms-lessons__badge"><?php echo esc_html($i + 1); ?></span>
+                  </span>
+                  <span class="presslms-lessons__body">
+                    <span class="presslms-lessons__title"><?php echo esc_html($l->post_title); ?></span>
+                    <?php if ($sidebar_duration > 0): ?>
+                      <span class="presslms-lessons__meta"><?php echo esc_html(presslms_format_seconds($sidebar_duration)); ?></span>
+                    <?php endif; ?>
+                  </span>
                 </a>
               <?php endforeach; ?>
             <?php endif; ?>

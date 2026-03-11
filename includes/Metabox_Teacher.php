@@ -65,7 +65,7 @@ class PRESS_LMS_Teacher_Meta
 
     echo '<div style="padding-top:4px;">';
 
-    // Profissão separada
+    // Keep the profession separate from the biography body.
     echo '<p style="margin:0 0 16px 0;">';
     echo '<label for="press_teacher_profession" style="display:block;font-weight:600;margin-bottom:6px;">Profissão</label>';
     echo '<input 
@@ -77,7 +77,7 @@ class PRESS_LMS_Teacher_Meta
             placeholder="Ex.: Desenvolvedor Sênior, Designer, Especialista em WordPress">';
     echo '</p>';
 
-    // Rótulo simples acima do editor
+    // Add a lightweight label before the rich-text editor.
     echo '<p style="margin:0 0 8px 0;font-weight:600;">Biografia resumida</p>';
 
     wp_editor(
@@ -139,7 +139,7 @@ class PRESS_LMS_Teacher_Meta
         if (!current_user_can('edit_post', $post_id)) return;
         if (!$post || $post->post_type !== 'press_teacher') return;
 
-        // Profissão
+        // Save the profession field.
         if (isset($_POST['press_teacher_profession'])) {
             update_post_meta(
                 $post_id,
@@ -148,7 +148,7 @@ class PRESS_LMS_Teacher_Meta
             );
         }
 
-        // Redes sociais
+        // Save teacher contact and social links.
         $social_fields = ['instagram', 'facebook', 'x', 'linkedin', 'website', 'behance', 'pinterest', 'email'];
 
         foreach ($social_fields as $field) {
@@ -173,7 +173,7 @@ class PRESS_LMS_Teacher_Meta
             }
         }
 
-        // Biografia -> salva em post_content
+        // Store the biography in post_content so the native editor keeps working as expected.
         if (isset($_POST['press_teacher_biography'])) {
             remove_action('save_post_press_teacher', [__CLASS__, 'save'], 10);
 

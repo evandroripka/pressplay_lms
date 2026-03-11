@@ -7,19 +7,19 @@ class PRESS_LMS_Vimeo
 
     public static function init()
     {
-        // nada por enquanto
+        // Reserved for future hooks.
     }
 
     public static function get_token()
     {
-        // Novo padrão: settings array
+        // Read the token from the settings array first.
         if (class_exists('PRESS_LMS_Settings')) {
             $t = PRESS_LMS_Settings::get('vimeo_token', '');
             $t = is_string($t) ? trim($t) : '';
             if ($t !== '') return $t;
         }
 
-        // Fallback: option antiga (caso já tenha salvo assim)
+        // Keep backward compatibility with the legacy standalone option.
         $token = get_option(self::OPT_TOKEN, '');
         return is_string($token) ? trim($token) : '';
     }
@@ -35,11 +35,11 @@ class PRESS_LMS_Vimeo
         $url = trim((string)$url);
         if ($url === '') return null;
 
-        // exemplos:
+        // Supported examples:
         // https://vimeo.com/123456789
         // https://player.vimeo.com/video/123456789
         // https://vimeo.com/manage/videos/123456789
-        // https://vimeo.com/123456789/abcdef (link privado)
+        // https://vimeo.com/123456789/abcdef
         if (preg_match('~vimeo\.com/(?:video/|manage/videos/)?(\d+)~i', $url, $m)) {
             return (int)$m[1];
         }
@@ -88,13 +88,57 @@ class PRESS_LMS_Vimeo
         $video_id = (int)$video_id;
         if (!$video_id) return new WP_Error('press_vimeo_invalid_id', 'Video ID inválido.');
 
-        // GET /videos/{video_id}
+        // Request the standard Vimeo video payload.
         return self::api_get('/videos/' . $video_id);
+    }
+
+    public static function extract_thumbnail_url($data, int $target_width = 640): string
+    {
+        if (!is_array($data)) {
+            return '';
+        }
+
+        $sizes = $data['pictures']['sizes'] ?? [];
+        if (!is_array($sizes) || empty($sizes)) {
+            return '';
+        }
+
+        $fallback = '';
+
+        foreach ($sizes as $size) {
+            if (!is_array($size)) {
+                continue;
+            }
+
+            $link = isset($size['link']) ? trim((string) $size['link']) : '';
+            if ($link === '') {
+                continue;
+            }
+
+            $fallback = $link;
+
+            $width = isset($size['width']) ? (int) $size['width'] : 0;
+            if ($width >= $target_width) {
+                return $link;
+            }
+        }
+
+        return $fallback;
+    }
+
+    public static function get_video_thumbnail_url(int $video_id, int $target_width = 640): string
+    {
+        $data = self::get_video_data($video_id);
+        if (is_wp_error($data)) {
+            return '';
+        }
+
+        return self::extract_thumbnail_url($data, $target_width);
     }
 
     public static function get_embed_html($video_id, $width = 960)
     {
-        // Player padrão do Vimeo (funciona para public/unlisted e private embeddable)
+        // Use the standard Vimeo player for public, unlisted, or embeddable private videos.
         $video_id = (int)$video_id;
         if (!$video_id) return '';
 
@@ -111,13 +155,12 @@ class PRESS_LMS_Vimeo
         $data = self::get_video_data($video_id);
         if (is_wp_error($data)) return 0;
 
-        $duration = isset($data['duration']) ? (int) $data['duration'] : 0; // seconds
+        $duration = isset($data['duration']) ? (int) $data['duration'] : 0; // Seconds.
         return max(0, $duration);
     }
 
     /**
-     * Útil para cache: o Vimeo retorna modified_time (ISO datetime).
-     * Se mudar, sabemos que o vídeo foi alterado (troca/edição) e dá pra refazer cache.
+     * Return the remote modification timestamp so duration and thumbnail caches can be refreshed.
      */
     public static function get_video_modified_time(int $video_id): string
     {

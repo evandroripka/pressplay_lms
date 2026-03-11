@@ -1,5 +1,5 @@
 <?php
-// inclui este arquivo no plugin principal
+// This post type is loaded from the main plugin bootstrap.
 class PRESSLMS_Teacher_CPT {
     public static function init() {
         add_action('init', [__CLASS__, 'register_cpt']);

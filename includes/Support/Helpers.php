@@ -2,6 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Helpers {
+    private static $lesson_thumbnail_cache = [];
 
     public static function get_course_lessons($course_id, $post_status = ['publish']) {
         $course_id = (int) $course_id;
@@ -55,6 +56,52 @@ class PRESS_LMS_Helpers {
         return $lessons;
     }
 
+    public static function get_lesson_thumbnail_url(int $lesson_id, int $course_id = 0, string $size = 'medium_large'): string
+    {
+        $lesson_id = (int) $lesson_id;
+        $course_id = (int) $course_id;
+        $size = trim($size);
+
+        if ($lesson_id <= 0) {
+            return '';
+        }
+
+        $cache_key = $lesson_id . ':' . $course_id . ':' . ($size !== '' ? $size : 'medium_large');
+        if (array_key_exists($cache_key, self::$lesson_thumbnail_cache)) {
+            return self::$lesson_thumbnail_cache[$cache_key];
+        }
+
+        $thumbnail_url = get_the_post_thumbnail_url($lesson_id, $size ?: 'medium_large');
+
+        if (!$thumbnail_url) {
+            $thumbnail_url = (string) get_post_meta($lesson_id, '_press_lesson_vimeo_thumbnail_url', true);
+        }
+
+        if (!$thumbnail_url) {
+            $vimeo_id = (int) get_post_meta($lesson_id, '_press_lesson_vimeo_id', true);
+
+            if (
+                $vimeo_id > 0 &&
+                class_exists('PRESS_LMS_Vimeo') &&
+                method_exists('PRESS_LMS_Vimeo', 'get_video_thumbnail_url')
+            ) {
+                $thumbnail_url = PRESS_LMS_Vimeo::get_video_thumbnail_url($vimeo_id);
+
+                if ($thumbnail_url !== '') {
+                    update_post_meta($lesson_id, '_press_lesson_vimeo_thumbnail_url', esc_url_raw($thumbnail_url));
+                }
+            }
+        }
+
+        if (!$thumbnail_url && $course_id > 0) {
+            $thumbnail_url = get_the_post_thumbnail_url($course_id, $size ?: 'medium_large');
+        }
+
+        self::$lesson_thumbnail_cache[$cache_key] = (string) $thumbnail_url;
+
+        return self::$lesson_thumbnail_cache[$cache_key];
+    }
+
     public static function username_from_email($email) {
         $base = sanitize_user(current(explode('@', $email)), true);
         if (!$base) $base = 'aluno';
@@ -68,9 +115,9 @@ class PRESS_LMS_Helpers {
     }
 
     public static function is_valid_phone_br($phone) {
-        // bem permissivo: você pode refinar depois
+        // Use a permissive validation rule for Brazilian phone numbers.
         $digits = preg_replace('/\D+/', '', $phone);
-        // (11) 9xxxx-xxxx => 11 dígitos + DDD => 11
+        // Accept landline and mobile formats with DDD.
         return (strlen($digits) >= 10 && strlen($digits) <= 13);
     }
 
@@ -78,11 +125,11 @@ class PRESS_LMS_Helpers {
         $digits = preg_replace('/\D+/', '', $phone);
         if (!$digits) return null;
 
-        // se já vier com 55...
+        // Keep numbers that already include the country code.
         if (str_starts_with($digits, '55')) {
             return '+' . $digits;
         }
-        // assume BR
+        // Otherwise, assume a Brazilian number.
         return '+55' . $digits;
     }
 
