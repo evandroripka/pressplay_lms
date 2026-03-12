@@ -1,15 +1,18 @@
 <?php
 
 /**
- * Plugin Name: Pressplay LMS
- * Description: WordPress LMS for courses, lessons, enrollments, progress tracking, and certificates.
- * Version: 1.0.0
- * Author: Evandro Ripkas
- * Author URI: https://evandroripka.dev
- * License: GPL2+
- * License URI: https://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain: pressplay-lms
- * Domain Path: /languages
+ * Plugin Name:       Pressplay LMS
+ * Description:       Sell online courses with WooCommerce-powered enrollments, protected lessons, student dashboards, progress tracking, and certificates.
+ * Version:           1.0.0
+ * Requires at least: 6.0
+ * Requires PHP:      8.0
+ * Requires Plugins:  woocommerce
+ * Author:            Evandro Ripka
+ * Author URI:        https://evandroripka.dev/
+ * License:           GPL v2 or later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       pressplay-lms
+ * Domain Path:       /languages
  */
 
 if (!defined('ABSPATH')) exit;

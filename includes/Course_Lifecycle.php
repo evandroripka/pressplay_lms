@@ -235,17 +235,9 @@ class PRESS_LMS_Course_Lifecycle
         }
 
         wp_enqueue_script(
-            'press-lms-sweetalert2',
-            'https://cdn.jsdelivr.net/npm/sweetalert2@11',
-            [],
-            '11.15.10',
-            true
-        );
-
-        wp_enqueue_script(
             'press-lms-course-delete-guard',
             PRESS_LMS_URL . 'assets/js/course-delete-guard.js',
-            ['jquery', 'press-lms-sweetalert2'],
+            ['jquery'],
             PRESS_LMS_VERSION,
             true
         );

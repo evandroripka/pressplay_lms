@@ -11,6 +11,7 @@ class PRESS_LMS_Settings
     {
         add_action('admin_menu', [__CLASS__, 'menu']);
         add_action('admin_init', [__CLASS__, 'register']);
+        add_action('admin_init', [__CLASS__, 'maybe_redirect_legacy_admin_pages']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_panel_assets']);
         add_action('admin_post_press_lms_manage_enrollment', [__CLASS__, 'handle_manage_enrollment']);
     }
@@ -30,9 +31,17 @@ class PRESS_LMS_Settings
             'Pressplay LMS',
             'manage_options',
             'press-lms',
-            ['PRESSPLAY_LMS_Admin', 'render'],
+            [__CLASS__, 'page_enrollments'],
             $icon_url,
             6
+        );
+        add_submenu_page(
+            'press-lms',
+            'Matrículas',
+            'Matrículas',
+            'manage_options',
+            'press-lms',
+            [__CLASS__, 'page_enrollments']
         );
         add_submenu_page(
             'press-lms', // Parent LMS menu slug.
@@ -40,22 +49,6 @@ class PRESS_LMS_Settings
             'Professores', // Menu label.
             'edit_posts', // Required capability.
             'edit.php?post_type=press_teacher' // Native teacher post type screen.
-        );
-        add_submenu_page(
-            'press-lms',
-            'Alunos',
-            'Alunos',
-            'manage_options',
-            'press-lms-students',
-            [__CLASS__, 'page_students']
-        );
-        add_submenu_page(
-            'press-lms',
-            'Matrículas',
-            'Matrículas',
-            'manage_options',
-            'press-lms-enrollments',
-            [__CLASS__, 'page_enrollments']
         );
         add_submenu_page(
             'press-lms',
@@ -186,8 +179,17 @@ class PRESS_LMS_Settings
     {
         if (!current_user_can('manage_options')) return;
 
-        echo '<div class="wrap">';
-        echo '<h1>Configurações</h1>';
+        echo '<div class="wrap presslms-admin-page presslms-admin-page--settings">';
+        echo '<div class="presslms-panel">';
+        echo '<div class="presslms-page-header">';
+        echo '<div>';
+        echo '<h1 class="presslms-page-title">Configurações</h1>';
+        echo '<p class="presslms-page-subtitle">Defina marca, e-mails, Vimeo e preferências operacionais do Pressplay LMS.</p>';
+        echo '</div>';
+        echo '</div>';
+
+        echo '<div class="presslms-admin-card">';
+        settings_errors(self::OPTION_KEY);
 
         echo '<form method="post" action="options.php">';
         settings_fields(self::GROUP_KEY);
@@ -196,12 +198,32 @@ class PRESS_LMS_Settings
         echo '</form>';
 
         echo '</div>';
+        echo '</div>';
+        echo '</div>';
     }
 
     private static function get_admin_panel_url(string $page_slug, array $args = []): string
     {
         $url = admin_url('admin.php?page=' . $page_slug);
         return !empty($args) ? add_query_arg($args, $url) : $url;
+    }
+
+    public static function maybe_redirect_legacy_admin_pages(): void
+    {
+        if (!is_admin()) {
+            return;
+        }
+
+        $page = isset($_GET['page']) ? sanitize_key((string) $_GET['page']) : '';
+        if (!in_array($page, ['press-lms-students', 'press-lms-enrollments'], true)) {
+            return;
+        }
+
+        $query_args = wp_unslash($_GET);
+        unset($query_args['page']);
+
+        wp_safe_redirect(add_query_arg($query_args, self::get_admin_panel_url('press-lms')));
+        exit;
     }
 
     private static function get_admin_panel_notice(?string $notice): ?array
@@ -442,35 +464,35 @@ class PRESS_LMS_Settings
     public static function page_students()
     {
         self::render_enrollment_panel(
-            'press-lms-students',
-            'Alunos',
-            'Gerencie alunos, matrículas e progresso por curso.'
+            'press-lms',
+            'Matrículas',
+            'Gerencie acessos, validade, pedidos e progresso por matrícula.'
         );
     }
 
     public static function page_enrollments()
     {
         self::render_enrollment_panel(
-            'press-lms-enrollments',
+            'press-lms',
             'Matrículas',
-            'Gerencie status, validade e ações operacionais das matrículas.'
+            'Gerencie acessos, validade, pedidos e progresso por matrícula.'
         );
     }
 
     public static function handle_manage_enrollment(): void
     {
         if (!current_user_can('manage_options')) {
-            wp_safe_redirect(self::get_admin_panel_url('press-lms-students', ['press_lms_notice' => 'enrollment_permission_denied']));
+            wp_safe_redirect(self::get_admin_panel_url('press-lms', ['press_lms_notice' => 'enrollment_permission_denied']));
             exit;
         }
 
         $enrollment_id = isset($_GET['enrollment_id']) ? (int) $_GET['enrollment_id'] : 0;
         $action_type = isset($_GET['enrollment_action']) ? sanitize_key((string) $_GET['enrollment_action']) : '';
-        $page_slug = isset($_GET['page_slug']) ? sanitize_key((string) $_GET['page_slug']) : 'press-lms-students';
-        $allowed_pages = ['press-lms-students', 'press-lms-enrollments'];
+        $page_slug = isset($_GET['page_slug']) ? sanitize_key((string) $_GET['page_slug']) : 'press-lms';
+        $allowed_pages = ['press-lms', 'press-lms-students', 'press-lms-enrollments'];
 
         if (!in_array($page_slug, $allowed_pages, true)) {
-            $page_slug = 'press-lms-students';
+            $page_slug = 'press-lms';
         }
 
         if ($enrollment_id <= 0 || $action_type === '') {
@@ -549,7 +571,6 @@ class PRESS_LMS_Settings
         $allowed_pages = [
             'press-lms',
             self::PAGE_SLUG,
-            'press-lms-students',
             'press-lms-enrollments',
             'press-lms-progress',
         ];
@@ -558,32 +579,17 @@ class PRESS_LMS_Settings
             return;
         }
 
-        // Load Bulma only on LMS admin screens.
-        wp_enqueue_style(
-            'presslms-bulma',
-            'https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css',
-            [],
-            '0.9.4'
-        );
-
         wp_enqueue_style(
             'presslms-admin-panels',
             PRESS_LMS_URL . 'assets/css/admin-panels.css',
-            ['presslms-bulma', 'press-lms-admin'],
+            ['press-lms-admin'],
             PRESS_LMS_VERSION
-        );
-        wp_enqueue_script(
-            'sweetalert2',
-            'https://cdn.jsdelivr.net/npm/sweetalert2@11',
-            [],
-            '11',
-            true
         );
 
         wp_enqueue_script(
             'presslms-admin-panels-js',
             PRESS_LMS_URL . 'assets/js/admin-panels.js',
-            ['jquery', 'sweetalert2'],
+            ['jquery'],
             PRESS_LMS_VERSION,
             true
         );
