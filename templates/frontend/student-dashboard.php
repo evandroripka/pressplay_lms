@@ -11,6 +11,7 @@ $urls = is_array($student_urls_var ?? null) ? $student_urls_var : [];
 
 $display_name = (string) ($profile['display_name'] ?? 'Aluno');
 $avatar_url = (string) ($profile['avatar_url'] ?? '');
+$has_custom_avatar = !empty($profile['has_custom_avatar']);
 $initials = (string) ($profile['initials'] ?? 'A');
 $email = (string) ($profile['email'] ?? '');
 $phone = (string) ($profile['phone'] ?? '');
@@ -94,7 +95,7 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
         <span class="presslms-student-stat__icon"><i class="fa-light fa-clock"></i></span>
         <div>
           <strong><?php echo esc_html((string) ($stats['content_duration_label'] ?? '0min')); ?></strong>
-          <span>Carga total disponível</span>
+          <span>Carga da biblioteca</span>
         </div>
       </article>
     </section>
@@ -102,7 +103,7 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
     <nav class="presslms-student-nav" aria-label="Navegação da área do aluno">
       <a class="presslms-student-nav__link<?php echo $active_tab === 'catalog' ? ' is-active' : ''; ?>" href="<?php echo esc_url($urls['catalog'] ?? '#'); ?>">
         <i class="fa-light fa-store"></i>
-        Showroom
+        Cursos
       </a>
       <a class="presslms-student-nav__link<?php echo $active_tab === 'courses' ? ' is-active' : ''; ?>" href="<?php echo esc_url($urls['courses'] ?? '#'); ?>">
         <i class="fa-light fa-graduation-cap"></i>
@@ -152,7 +153,8 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
               <div class="presslms-student-course__content">
                 <div class="presslms-student-course__top">
                   <div class="presslms-student-course__badges">
-                    <span class="presslms-student-pill presslms-student-pill--status"><?php echo esc_html((string) $course['status_label']); ?></span>
+                    <span class="presslms-student-pill presslms-student-pill--status"><?php echo esc_html((string) $course['access_status_label']); ?></span>
+                    <span class="presslms-student-pill"><?php echo esc_html((string) $course['learning_status_label']); ?></span>
                     <span class="presslms-student-pill"><?php echo esc_html((string) $course['progress_percent']); ?>% concluído</span>
                   </div>
                   <?php if (!empty($course['purchased_at'])): ?>
@@ -250,33 +252,64 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
       <section class="presslms-student-profile-grid">
         <article class="presslms-card presslms-student-profile-card">
           <div class="presslms-card__header">
-            <h2 class="presslms-h2"><i class="fa-light fa-id-card"></i> Dados da conta</h2>
+            <h2 class="presslms-h2"><i class="fa-light fa-id-card"></i> Editar perfil</h2>
           </div>
-          <dl class="presslms-student-detail-list">
-            <div>
-              <dt>Nome</dt>
-              <dd><?php echo esc_html($display_name); ?></dd>
+          <form class="presslms-student-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="press_lms_update_account_profile">
+            <?php wp_nonce_field('press_lms_update_account_profile', 'press_lms_account_profile_nonce'); ?>
+
+            <div class="presslms-student-avatar-editor">
+              <div class="presslms-student-avatar presslms-student-avatar--editor" aria-hidden="true">
+                <?php if ($avatar_url): ?>
+                  <img src="<?php echo esc_url($avatar_url); ?>" alt="" loading="lazy">
+                <?php else: ?>
+                  <span><?php echo esc_html($initials); ?></span>
+                <?php endif; ?>
+              </div>
+
+              <div class="presslms-student-avatar-editor__content">
+                <label class="presslms-student-form__label" for="presslms-profile-avatar">Foto de perfil</label>
+                <input class="presslms-student-form__input presslms-student-form__input--file" id="presslms-profile-avatar" type="file" name="profile_avatar" accept="image/*">
+                <p class="presslms-muted">Envie uma imagem JPG, PNG ou WebP para personalizar seu perfil.</p>
+                <?php if ($has_custom_avatar): ?>
+                  <label class="presslms-student-form__check">
+                    <input type="checkbox" name="remove_avatar" value="1">
+                    Remover foto atual
+                  </label>
+                <?php endif; ?>
+              </div>
             </div>
-            <div>
-              <dt>E-mail</dt>
-              <dd><?php echo esc_html($email); ?></dd>
-            </div>
-            <div>
-              <dt>Telefone</dt>
-              <dd><?php echo $phone !== '' ? esc_html($phone) : 'Não informado'; ?></dd>
-            </div>
-            <div>
-              <dt>Membro desde</dt>
-              <dd><?php echo $registered_at !== '' ? esc_html($registered_at) : 'Não disponível'; ?></dd>
-            </div>
-          </dl>
+
+            <label class="presslms-student-form__label" for="presslms-profile-name">Nome completo</label>
+            <input class="presslms-student-form__input" id="presslms-profile-name" type="text" name="full_name" value="<?php echo esc_attr($display_name); ?>" required>
+
+            <label class="presslms-student-form__label" for="presslms-profile-email">E-mail</label>
+            <input class="presslms-student-form__input" id="presslms-profile-email" type="email" name="email" value="<?php echo esc_attr($email); ?>" required>
+
+            <label class="presslms-student-form__label" for="presslms-profile-phone">Telefone</label>
+            <input class="presslms-student-form__input" id="presslms-profile-phone" type="text" name="phone" value="<?php echo esc_attr($phone); ?>" required placeholder="(11) 91234-5678">
+
+            <button class="presslms-btn presslms-btn--primary" type="submit">
+              <i class="fa-light fa-floppy-disk"></i>
+              Salvar perfil
+            </button>
+          </form>
         </article>
 
         <article class="presslms-card presslms-student-profile-card">
           <div class="presslms-card__header">
-            <h2 class="presslms-h2"><i class="fa-light fa-shield-keyhole"></i> Segurança da conta</h2>
+            <h2 class="presslms-h2"><i class="fa-light fa-user-shield"></i> Conta e segurança</h2>
           </div>
-          <p class="presslms-muted">Gerencie sua senha em uma tela dedicada para manter o acesso à área do aluno e aos seus certificados.</p>
+          <dl class="presslms-student-detail-list">
+            <div>
+              <dt>Membro desde</dt>
+              <dd><?php echo $registered_at !== '' ? esc_html($registered_at) : 'Não disponível'; ?></dd>
+            </div>
+            <div>
+              <dt>Senha</dt>
+              <dd>Atualize sua senha sempre que precisar manter a conta segura.</dd>
+            </div>
+          </dl>
           <a class="presslms-btn presslms-btn--primary" href="<?php echo esc_url($urls['password'] ?? '#'); ?>">
             <i class="fa-light fa-key"></i>
             Ir para trocar senha

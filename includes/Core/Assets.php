@@ -37,7 +37,7 @@ class PRESSLMS_Assets
 
     if ($path === '') return false;
 
-    return (bool) preg_match('#^meus-cursos(?:/.*)?$#', $path);
+    return (bool) preg_match('#^(meus-cursos(?:/.*)?|perfil(?:/.*)?)$#', $path);
   }
 
   private static function is_catalog_route(): bool

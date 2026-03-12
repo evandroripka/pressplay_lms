@@ -21,6 +21,7 @@ class PRESS_LMS_Plugin
         PRESS_LMS_Roles::init();
         PRESS_LMS_Rewrite::init();
         PRESS_LMS_Frontend::init();
+        PRESS_LMS_Mailer::init();
         PRESS_LMS_Menu::init();
         PRESS_LMS_CPT::init();
         PRESSLMS_Teacher_CPT::init();

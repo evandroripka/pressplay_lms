@@ -114,7 +114,14 @@ class PRESS_LMS_Certificate
     {
         $html = (string) get_post_meta($course_id, '_press_course_certificate_html', true);
 
-        if (trim($html) !== '') {
+        if (
+            trim($html) !== '' &&
+            (
+                !class_exists('PRESS_LMS_Course_Meta') ||
+                !method_exists('PRESS_LMS_Course_Meta', 'is_legacy_default_certificate_html') ||
+                !PRESS_LMS_Course_Meta::is_legacy_default_certificate_html($html)
+            )
+        ) {
             return $html;
         }
 
@@ -125,6 +132,62 @@ class PRESS_LMS_Certificate
         }
 
         return '';
+    }
+
+    public static function get_available_certificates_for_user(int $user_id): array
+    {
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return [];
+        }
+
+        $enrollments = class_exists('PRESS_LMS_Enrollments') && method_exists('PRESS_LMS_Enrollments', 'get_user_enrollments')
+            ? PRESS_LMS_Enrollments::get_user_enrollments($user_id, ['include_pending' => false])
+            : [];
+
+        $certificates = [];
+        $seen_courses = [];
+
+        foreach ($enrollments as $enrollment) {
+            $course_id = isset($enrollment->course_id) ? (int) $enrollment->course_id : 0;
+            if ($course_id <= 0 || isset($seen_courses[$course_id])) {
+                continue;
+            }
+
+            if (!self::is_course_completed($user_id, $course_id)) {
+                continue;
+            }
+
+            $course = get_post($course_id);
+            if (!$course instanceof WP_Post || $course->post_type !== 'press_course') {
+                continue;
+            }
+
+            $completed_at_raw = self::get_course_completed_at($user_id, $course_id);
+
+            $certificates[] = [
+                'course_id' => $course_id,
+                'course_title' => (string) $course->post_title,
+                'thumbnail_url' => (string) get_the_post_thumbnail_url($course_id, 'medium_large'),
+                'completed_at' => $completed_at_raw ? date_i18n('d/m/Y', strtotime($completed_at_raw)) : '',
+                'completed_at_sort' => $completed_at_raw ?: '',
+                'certificate_url' => home_url('/meus-cursos/certificado/' . $course->post_name . '/'),
+                'course_url' => home_url('/curso/' . $course->post_name . '/'),
+            ];
+
+            $seen_courses[$course_id] = true;
+        }
+
+        usort($certificates, static function (array $left, array $right): int {
+            return strcmp((string) ($right['completed_at_sort'] ?? ''), (string) ($left['completed_at_sort'] ?? ''));
+        });
+
+        foreach ($certificates as &$certificate) {
+            unset($certificate['completed_at_sort']);
+        }
+        unset($certificate);
+
+        return $certificates;
     }
 
     public static function replace_placeholders(string $html, array $data): string
@@ -376,6 +439,7 @@ class PRESS_LMS_Certificate
             }
 
             .presslms-cert {
+                border-radius: 20px;
                 box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
             }
         }

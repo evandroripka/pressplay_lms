@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Rewrite
 {
-    private const SCHEMA_VERSION = '20260311_student_area_v1';
+    private const SCHEMA_VERSION = '20260312_student_area_v2';
 
     public static function get_schema_version(): string
     {
@@ -52,8 +52,21 @@ class PRESS_LMS_Rewrite
 
         // Student dashboard sections with dedicated URLs.
         add_rewrite_rule(
-            '^meus-cursos/(certificados|perfil|trocar-senha)/?$',
+            '^meus-cursos/certificados/?$',
             'index.php?press_my_courses=1&press_student_area=$matches[1]',
+            'top'
+        );
+
+        // Profile routes live outside the course library hierarchy.
+        add_rewrite_rule(
+            '^perfil/?$',
+            'index.php?press_my_courses=1&press_student_area=profile',
+            'top'
+        );
+
+        add_rewrite_rule(
+            '^perfil/trocar-senha/?$',
+            'index.php?press_my_courses=1&press_student_area=password',
             'top'
         );
 
@@ -108,12 +121,30 @@ class PRESS_LMS_Rewrite
         $request_path = self::get_request_path();
 
         if ($request_path !== '') {
+            if (preg_match('#^meus-cursos/perfil/?$#', $request_path)) {
+                self::redirect_legacy_student_area('profile');
+            }
+
+            if (preg_match('#^meus-cursos/trocar-senha/?$#', $request_path)) {
+                self::redirect_legacy_student_area('password');
+            }
+
             if ($student_certificate === '' && preg_match('#^meus-cursos/certificado/([^/]+)/?$#', $request_path, $matches)) {
                 $student_certificate = sanitize_title($matches[1]);
             }
 
-            if ($student_area === '' && preg_match('#^meus-cursos/(certificados|perfil|trocar-senha)/?$#', $request_path, $matches)) {
+            if ($student_area === '' && preg_match('#^meus-cursos/(certificados)/?$#', $request_path, $matches)) {
                 $student_area = sanitize_key($matches[1]);
+                $my_courses = true;
+            }
+
+            if ($student_area === '' && preg_match('#^perfil/?$#', $request_path)) {
+                $student_area = 'profile';
+                $my_courses = true;
+            }
+
+            if ($student_area === '' && preg_match('#^perfil/trocar-senha/?$#', $request_path)) {
+                $student_area = 'password';
                 $my_courses = true;
             }
 
@@ -139,14 +170,15 @@ class PRESS_LMS_Rewrite
 
         // 1) Lesson page
         if ($course_slug && $lesson_slug) {
-            PRESS_LMS_Frontend::render_lesson_by_slug($course_slug, $lesson_slug);
-            exit;
+            set_query_var('press_course_slug', $course_slug);
+            set_query_var('press_lesson_slug', $lesson_slug);
+            return;
         }
 
         // 2) Course page
         if ($course_slug && !$lesson_slug) {
-            PRESS_LMS_Frontend::render_course_by_slug($course_slug);
-            exit;
+            set_query_var('press_course_slug', $course_slug);
+            return;
         }
 
         // 3) Student certificate
@@ -157,23 +189,23 @@ class PRESS_LMS_Rewrite
 
         // 4) Course catalog
         if ($course_archive) {
-            PRESS_LMS_Frontend::render_course_archive();
-            exit;
+            set_query_var('press_course_archive', 1);
+            return;
         }
 
         // 5) Student dashboard
         if ($my_courses) {
+            set_query_var('press_my_courses', 1);
             if ($student_area !== '') {
                 set_query_var('press_student_area', $student_area);
             }
-            PRESS_LMS_Frontend::render_my_courses();
-            exit;
+            return;
         }
 
         // 6) Registration
         if ($register) {
-            PRESS_LMS_Frontend::render_register();
-            exit;
+            set_query_var('press_register', 1);
+            return;
         }
     }
 
@@ -181,10 +213,25 @@ class PRESS_LMS_Rewrite
     {
         $path = self::get_request_path();
 
-        if ($path !== '' && preg_match('#^(curso/[^/]+(?:/aula/[^/]+)?|meus-cursos(?:/(?:certificados|perfil|trocar-senha|certificado/[^/]+))?|cursos|cadastro)/?$#', $path)) {
+        if ($path !== '' && preg_match('#^(curso/[^/]+(?:/aula/[^/]+)?|meus-cursos(?:/(?:certificados|perfil|trocar-senha|certificado/[^/]+))?|perfil(?:/trocar-senha)?|cursos|cadastro)/?$#', $path)) {
             return false;
         }
 
         return $redirect_url;
+    }
+
+    private static function redirect_legacy_student_area(string $area): void
+    {
+        if (!class_exists('PRESS_LMS_Frontend') || !method_exists('PRESS_LMS_Frontend', 'get_student_area_url')) {
+            return;
+        }
+
+        $args = [];
+        if (!empty($_GET['notice'])) {
+            $args['notice'] = sanitize_key((string) wp_unslash($_GET['notice']));
+        }
+
+        wp_safe_redirect(PRESS_LMS_Frontend::get_student_area_url($area, $args));
+        exit;
     }
 }

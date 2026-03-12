@@ -154,6 +154,369 @@ class PRESS_LMS_Enrollments
         return 'Acesso até ' . date_i18n('d/m/Y', $expires_timestamp);
     }
 
+    public static function get_enrollment_status_key($enrollment): string
+    {
+        if (!is_object($enrollment)) {
+            return 'unknown';
+        }
+
+        $status = sanitize_key((string) ($enrollment->status ?? ''));
+        if ($status === '') {
+            return 'unknown';
+        }
+
+        if ($status === 'active' && self::is_expired_at(!empty($enrollment->expires_at) ? (string) $enrollment->expires_at : null)) {
+            return 'expired';
+        }
+
+        return $status;
+    }
+
+    public static function is_enrollment_currently_active($enrollment): bool
+    {
+        return self::get_enrollment_status_key($enrollment) === 'active';
+    }
+
+    public static function get_enrollment_status_label($enrollment): string
+    {
+        $labels = [
+            'active' => 'Ativo',
+            'expired' => 'Expirado',
+            'pending' => 'Pendente',
+            'blocked' => 'Bloqueado',
+            'cancelled' => 'Cancelado',
+            'failed' => 'Pagamento falhou',
+            'refunded' => 'Reembolsado',
+            'unknown' => 'Desconhecido',
+        ];
+
+        $status_key = self::get_enrollment_status_key($enrollment);
+        return $labels[$status_key] ?? $labels['unknown'];
+    }
+
+    public static function get_enrollment_status_class($enrollment): string
+    {
+        $classes = [
+            'active' => 'is-success is-light',
+            'expired' => 'is-danger is-light',
+            'pending' => 'is-warning is-light',
+            'blocked' => 'is-danger is-light',
+            'cancelled' => 'is-light',
+            'failed' => 'is-danger is-light',
+            'refunded' => 'is-info is-light',
+            'unknown' => 'is-light',
+        ];
+
+        $status_key = self::get_enrollment_status_key($enrollment);
+        return $classes[$status_key] ?? $classes['unknown'];
+    }
+
+    public static function get_enrollment_access_summary($enrollment): string
+    {
+        $status_key = self::get_enrollment_status_key($enrollment);
+        $expires_at = !empty($enrollment->expires_at) ? (string) $enrollment->expires_at : '';
+
+        switch ($status_key) {
+            case 'active':
+                return self::format_enrollment_expires_at($expires_at !== '' ? $expires_at : null);
+
+            case 'expired':
+                return $expires_at !== ''
+                    ? 'Expirou em ' . date_i18n('d/m/Y', strtotime($expires_at))
+                    : 'Acesso expirado';
+
+            case 'pending':
+                return 'Aguardando confirmação do pagamento';
+
+            case 'blocked':
+                return 'Acesso bloqueado manualmente';
+
+            case 'cancelled':
+                return 'Pedido cancelado';
+
+            case 'failed':
+                return 'Pagamento não aprovado';
+
+            case 'refunded':
+                return 'Pedido reembolsado';
+
+            default:
+                return 'Status da matrícula indisponível';
+        }
+    }
+
+    public static function get_enrollment_by_id(int $enrollment_id)
+    {
+        global $wpdb;
+
+        $enrollment_id = (int) $enrollment_id;
+        if ($enrollment_id <= 0) {
+            return null;
+        }
+
+        $table = PRESS_LMS_Database::table('enrollments');
+
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT *
+                 FROM {$table}
+                 WHERE id = %d
+                 LIMIT 1",
+                $enrollment_id
+            )
+        );
+    }
+
+    public static function has_any_enrollment(int $user_id): bool
+    {
+        global $wpdb;
+
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        $table = PRESS_LMS_Database::table('enrollments');
+        $id = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id
+                 FROM {$table}
+                 WHERE user_id = %d
+                 LIMIT 1",
+                $user_id
+            )
+        );
+
+        return !empty($id);
+    }
+
+    public static function get_user_enrollments(int $user_id, array $args = []): array
+    {
+        global $wpdb;
+
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return [];
+        }
+
+        $defaults = [
+            'include_pending' => true,
+        ];
+        $args = wp_parse_args($args, $defaults);
+
+        $table = PRESS_LMS_Database::table('enrollments');
+        $posts_table = $wpdb->posts;
+        $now = current_time('mysql');
+
+        $where = [
+            'e.user_id = %d',
+        ];
+        $where_params = [$user_id];
+
+        if (empty($args['include_pending'])) {
+            $where[] = 'e.status <> %s';
+            $where_params[] = 'pending';
+        }
+
+        $sql = "
+            SELECT
+                e.id,
+                e.course_id,
+                e.status,
+                e.purchased_at,
+                e.expires_at,
+                e.payment_provider,
+                e.order_ref,
+                e.created_at,
+                e.updated_at,
+                p.post_title AS course_title,
+                p.post_name AS course_slug,
+                p.post_status AS course_post_status
+            FROM {$table} e
+            INNER JOIN {$posts_table} p
+                ON p.ID = e.course_id
+               AND p.post_type = %s
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY CASE
+                WHEN e.status = 'active' AND (e.expires_at IS NULL OR e.expires_at > %s) THEN 0
+                WHEN e.status = 'pending' THEN 1
+                ELSE 2
+            END,
+            COALESCE(e.purchased_at, e.created_at) DESC,
+            e.id DESC
+        ";
+
+        $params = array_merge(['press_course'], $where_params, [$now]);
+
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $params));
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public static function attach_order_to_pending_enrollment(int $user_id, int $course_id, int $order_id, string $provider = 'woocommerce'): void
+    {
+        global $wpdb;
+
+        $user_id = (int) $user_id;
+        $course_id = (int) $course_id;
+        $order_id = (int) $order_id;
+
+        if ($user_id <= 0 || $course_id <= 0 || $order_id <= 0) {
+            return;
+        }
+
+        $table = PRESS_LMS_Database::table('enrollments');
+        $now = current_time('mysql');
+
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$table}
+                 SET order_ref = %s,
+                     payment_provider = %s,
+                     updated_at = %s
+                 WHERE user_id = %d
+                   AND course_id = %d
+                   AND status = %s",
+                (string) $order_id,
+                $provider,
+                $now,
+                $user_id,
+                $course_id,
+                'pending'
+            )
+        );
+    }
+
+    public static function deactivate_enrollment(int $user_id, int $course_id, string $status = 'blocked', int $order_id = 0): bool
+    {
+        global $wpdb;
+
+        $user_id = (int) $user_id;
+        $course_id = (int) $course_id;
+        $order_id = (int) $order_id;
+
+        if ($user_id <= 0 || $course_id <= 0) {
+            return false;
+        }
+
+        $table = PRESS_LMS_Database::table('enrollments');
+        $now_ts = current_time('timestamp');
+        $now = date('Y-m-d H:i:s', $now_ts);
+
+        $where_sql = "user_id = %d AND course_id = %d";
+        $params = [$user_id, $course_id];
+
+        if ($order_id > 0) {
+            $where_sql .= " AND order_ref = %s";
+            $params[] = (string) $order_id;
+        }
+
+        $where_sql .= " LIMIT 1";
+
+        $enrollment = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT *
+                 FROM {$table}
+                 WHERE {$where_sql}",
+                ...$params
+            )
+        );
+
+        if (!$enrollment) {
+            return false;
+        }
+
+        $result = $wpdb->update(
+            $table,
+            [
+                'status' => sanitize_key($status),
+                'expires_at' => $now,
+                'updated_at' => $now,
+            ],
+            ['id' => (int) $enrollment->id]
+        );
+
+        return $result !== false;
+    }
+
+    public static function reactivate_enrollment_by_id(int $enrollment_id): bool
+    {
+        global $wpdb;
+
+        $enrollment = self::get_enrollment_by_id($enrollment_id);
+        if (!$enrollment) {
+            return false;
+        }
+
+        $expires_at = self::calculate_enrollment_expiration((int) $enrollment->course_id, current_time('timestamp'));
+        $now = current_time('mysql');
+        $table = PRESS_LMS_Database::table('enrollments');
+
+        $result = $wpdb->update(
+            $table,
+            [
+                'status' => 'active',
+                'purchased_at' => !empty($enrollment->purchased_at) ? $enrollment->purchased_at : $now,
+                'expires_at' => $expires_at,
+                'updated_at' => $now,
+            ],
+            ['id' => (int) $enrollment_id]
+        );
+
+        if ($result !== false && class_exists('PRESS_LMS_Mailer')) {
+            $updated_enrollment = self::get_enrollment_by_id($enrollment_id);
+            PRESS_LMS_Mailer::send_enrollment_activated_email(
+                (int) $enrollment->user_id,
+                (int) $enrollment->course_id,
+                $updated_enrollment ?: $enrollment
+            );
+        }
+
+        return $result !== false;
+    }
+
+    public static function extend_enrollment_by_id(int $enrollment_id, int $amount, string $unit = 'days'): bool
+    {
+        global $wpdb;
+
+        $enrollment = self::get_enrollment_by_id($enrollment_id);
+        if (!$enrollment) {
+            return false;
+        }
+
+        $amount = max(1, (int) $amount);
+        $unit = sanitize_key($unit);
+        if (!in_array($unit, ['days', 'months', 'years'], true)) {
+            $unit = 'days';
+        }
+
+        $base_timestamp = current_time('timestamp');
+        if (!empty($enrollment->expires_at)) {
+            $current_expiry = strtotime((string) $enrollment->expires_at);
+            if ($current_expiry && $current_expiry > $base_timestamp) {
+                $base_timestamp = $current_expiry;
+            }
+        }
+
+        $new_expiry = strtotime('+' . $amount . ' ' . $unit, $base_timestamp);
+        if (!$new_expiry) {
+            return false;
+        }
+
+        $table = PRESS_LMS_Database::table('enrollments');
+        $result = $wpdb->update(
+            $table,
+            [
+                'status' => 'active',
+                'expires_at' => date('Y-m-d H:i:s', $new_expiry),
+                'updated_at' => current_time('mysql'),
+            ],
+            ['id' => (int) $enrollment_id]
+        );
+
+        return $result !== false;
+    }
+
     public static function has_active_enrollment(int $user_id, int $course_id): bool
     {
         global $wpdb;
@@ -282,7 +645,7 @@ class PRESS_LMS_Enrollments
         // Make the student role the primary role for LMS users.
         $user->set_role('press_student');
     }
-    public static function activate_enrollment(int $user_id, int $course_id, int $order_id, string $provider = 'woocommerce'): void
+    public static function activate_enrollment(int $user_id, int $course_id, int $order_id, string $provider = 'woocommerce'): bool
     {
         global $wpdb;
 
@@ -298,6 +661,18 @@ class PRESS_LMS_Enrollments
         $sql = "SELECT id FROM {$table} WHERE user_id=%d AND course_id=%d LIMIT 1";
         $id = $wpdb->get_var($wpdb->prepare($sql, $user_id, $course_id));
 
+        if ($id) {
+            $existing = self::get_enrollment_by_id((int) $id);
+            if (
+                $existing &&
+                $existing->status === 'active' &&
+                (string) ($existing->order_ref ?? '') === (string) $order_id &&
+                !self::is_expired_at((string) ($existing->expires_at ?? ''))
+            ) {
+                return false;
+            }
+        }
+
         $data = [
             'status' => 'active',
             'purchased_at' => $now,
@@ -308,13 +683,26 @@ class PRESS_LMS_Enrollments
         ];
 
         if ($id) {
-            $wpdb->update($table, $data, ['id' => (int)$id]);
+            $result = $wpdb->update($table, $data, ['id' => (int)$id]);
+            $enrollment_id = (int) $id;
         } else {
             $data['user_id'] = $user_id;
             $data['course_id'] = $course_id;
             $data['created_at'] = $now;
-            $wpdb->insert($table, $data);
+            $result = $wpdb->insert($table, $data);
+            $enrollment_id = (int) $wpdb->insert_id;
         }
+
+        if ($result === false) {
+            return false;
+        }
+
+        if (class_exists('PRESS_LMS_Mailer')) {
+            $enrollment = $enrollment_id > 0 ? self::get_enrollment_by_id($enrollment_id) : null;
+            PRESS_LMS_Mailer::send_enrollment_activated_email($user_id, $course_id, $enrollment);
+        }
+
+        return true;
     }
 
     public static function get_course_product_id(int $course_id): int

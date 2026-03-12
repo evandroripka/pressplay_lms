@@ -10,13 +10,13 @@
       <div class="presslms-cert__badge">Certificado Oficial</div>
     </div>
 
-    <h1 class="presslms-cert__title">Certificate of Completion</h1>
-    <p class="presslms-cert__subtitle">This certificate is proudly presented to</p>
+    <h1 class="presslms-cert__title">Certificado de Conclusão</h1>
+    <p class="presslms-cert__subtitle">Certificamos que</p>
 
     <div class="presslms-cert__student">{{student_name}}</div>
 
     <div class="presslms-cert__text">
-      for successfully completing the online course
+      concluiu com êxito o curso online
     </div>
 
     <div class="presslms-cert__course">{{course_name}}</div>
@@ -27,12 +27,12 @@
 
     <div class="presslms-cert__meta-grid">
       <div class="presslms-cert__meta-card">
-        <div class="presslms-cert__meta-label">Course Duration</div>
+        <div class="presslms-cert__meta-label">Duração do curso</div>
         <div class="presslms-cert__meta-value">{{course_duration}}</div>
       </div>
 
       <div class="presslms-cert__meta-card">
-        <div class="presslms-cert__meta-label">Completion Date</div>
+        <div class="presslms-cert__meta-label">Data de conclusão</div>
         <div class="presslms-cert__meta-value">{{completion_date}}</div>
       </div>
     </div>
@@ -41,11 +41,11 @@
       <div class="presslms-cert__signature-block">
         <img src="{{signature_url}}" alt="Signature">
         <div class="presslms-cert__line"></div>
-        <div class="presslms-cert__label">Authorized Signature</div>
+        <div class="presslms-cert__label">Assinatura autorizada</div>
       </div>
 
       <div class="presslms-cert__seal">
-        Verified
+        Verificado
         <strong>LMS</strong>
       </div>
     </div>

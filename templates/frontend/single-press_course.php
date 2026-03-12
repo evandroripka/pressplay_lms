@@ -8,6 +8,7 @@ $can_access  = (bool) ($can_access_var ?? false);
 
 $trailer     = (string) ($trailer_var ?? '');
 $course_access_label = (string) ($course_access_label_var ?? '');
+$course_notice = is_array($course_notice_var ?? null) ? $course_notice_var : null;
 $lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 $course_thumbnail_url = get_the_post_thumbnail_url($course->ID, 'medium_large') ?: '';
 $course_duration_seconds = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
@@ -57,6 +58,11 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
   <div class="presslms__container">
     <header class="presslms-course-hero">
       <div class="presslms-course-hero__left">
+        <?php if ($course_notice): ?>
+          <div class="presslms-card presslms-student-notice presslms-student-notice--<?php echo esc_attr((string) ($course_notice['type'] ?? 'error')); ?>" style="margin-bottom:16px;">
+            <?php echo esc_html((string) ($course_notice['message'] ?? '')); ?>
+          </div>
+        <?php endif; ?>
         <h1 class="presslms-h1"><?php echo esc_html($course->post_title); ?></h1>
         <div class="presslms-course-hero__meta">
           <span class="presslms-chip">

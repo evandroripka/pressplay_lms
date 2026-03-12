@@ -10,6 +10,7 @@ class PRESS_LMS_Actions
 
         add_action('admin_post_press_lms_enroll_continue', [__CLASS__, 'handle_enroll_continue']);
         add_action('admin_post_nopriv_press_lms_enroll_continue', [__CLASS__, 'handle_enroll_continue']);
+        add_action('admin_post_press_lms_update_account_profile', [__CLASS__, 'handle_account_profile_update']);
         add_action('admin_post_press_lms_update_account_password', [__CLASS__, 'handle_account_password_update']);
         add_action('wp_ajax_press_lms_track_progress', [__CLASS__, 'ajax_track_progress']);
         // Preserve redirect_to values across WooCommerce login and registration.
@@ -190,6 +191,158 @@ class PRESS_LMS_Actions
         return !empty($args) ? add_query_arg($args, $base_url) : $base_url;
     }
 
+    private static function get_course_frontend_url(int $course_id): string
+    {
+        $course = get_post($course_id);
+        if (!$course instanceof WP_Post || $course->post_type !== 'press_course') {
+            return '';
+        }
+
+        return home_url('/curso/' . $course->post_name . '/');
+    }
+
+    private static function redirect_to_enrollment_notice(string $notice, int $course_id = 0, string $fallback_url = ''): void
+    {
+        $target = '';
+
+        if ($course_id > 0) {
+            $target = self::get_course_frontend_url($course_id);
+            if ($target !== '') {
+                $target = add_query_arg('notice', sanitize_key($notice), $target);
+            }
+        }
+
+        if ($target === '' && $fallback_url !== '') {
+            $target = wp_validate_redirect($fallback_url, '');
+            if ($target !== '') {
+                $target = add_query_arg('notice', sanitize_key($notice), $target);
+            }
+        }
+
+        if ($target === '') {
+            $target = class_exists('PRESS_LMS_Frontend') && method_exists('PRESS_LMS_Frontend', 'get_student_area_url')
+                ? PRESS_LMS_Frontend::get_student_area_url('catalog')
+                : home_url('/');
+        }
+
+        wp_safe_redirect($target);
+        exit;
+    }
+
+    private static function handle_account_avatar_upload(int $user_id)
+    {
+        if (
+            empty($_FILES['profile_avatar']) ||
+            !is_array($_FILES['profile_avatar']) ||
+            (int) ($_FILES['profile_avatar']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE
+        ) {
+            return 0;
+        }
+
+        if (!function_exists('media_handle_upload')) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            require_once ABSPATH . 'wp-admin/includes/media.php';
+            require_once ABSPATH . 'wp-admin/includes/image.php';
+        }
+
+        $attachment_id = media_handle_upload('profile_avatar', 0, [], [
+            'test_form' => false,
+        ]);
+
+        if (is_wp_error($attachment_id)) {
+            return $attachment_id;
+        }
+
+        $mime_type = (string) get_post_mime_type($attachment_id);
+        if ($mime_type === '' || !str_starts_with($mime_type, 'image/')) {
+            wp_delete_attachment((int) $attachment_id, true);
+            return new WP_Error('profile_avatar_invalid', 'Invalid avatar upload.');
+        }
+
+        wp_update_post([
+            'ID' => (int) $attachment_id,
+            'post_author' => $user_id,
+        ]);
+
+        return (int) $attachment_id;
+    }
+
+    public static function handle_account_profile_update()
+    {
+        if (!is_user_logged_in()) {
+            wp_safe_redirect(self::get_student_dashboard_url('courses'));
+            exit;
+        }
+
+        $user_id = get_current_user_id();
+
+        if (
+            !isset($_POST['press_lms_account_profile_nonce']) ||
+            !wp_verify_nonce((string) $_POST['press_lms_account_profile_nonce'], 'press_lms_update_account_profile')
+        ) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_nonce_invalid']));
+            exit;
+        }
+
+        $full_name = sanitize_text_field((string) wp_unslash($_POST['full_name'] ?? ''));
+        $phone = sanitize_text_field((string) wp_unslash($_POST['phone'] ?? ''));
+        $email = sanitize_email((string) wp_unslash($_POST['email'] ?? ''));
+        $remove_avatar = !empty($_POST['remove_avatar']);
+
+        if (strlen(trim($full_name)) < 5) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_name_invalid']));
+            exit;
+        }
+
+        if ($phone === '' || !PRESS_LMS_Helpers::is_valid_phone_br($phone)) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_phone_invalid']));
+            exit;
+        }
+
+        if (!is_email($email)) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_email_invalid']));
+            exit;
+        }
+
+        $email_owner_id = email_exists($email);
+        if ($email_owner_id && (int) $email_owner_id !== $user_id) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_email_exists']));
+            exit;
+        }
+
+        $uploaded_avatar_id = self::handle_account_avatar_upload($user_id);
+        if (is_wp_error($uploaded_avatar_id)) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_avatar_invalid']));
+            exit;
+        }
+
+        $updated_user = wp_update_user([
+            'ID' => $user_id,
+            'display_name' => $full_name,
+            'first_name' => $full_name,
+            'nickname' => $full_name,
+            'user_email' => $email,
+        ]);
+
+        if (is_wp_error($updated_user)) {
+            wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_update_failed']));
+            exit;
+        }
+
+        PRESS_LMS_Helpers::upsert_student_profile($user_id, $full_name, $phone);
+
+        if ($remove_avatar) {
+            PRESS_LMS_Helpers::set_student_avatar_id($user_id, 0);
+        }
+
+        if ((int) $uploaded_avatar_id > 0) {
+            PRESS_LMS_Helpers::set_student_avatar_id($user_id, (int) $uploaded_avatar_id);
+        }
+
+        wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_updated']));
+        exit;
+    }
+
     public static function handle_account_password_update()
     {
         if (!is_user_logged_in()) {
@@ -255,21 +408,22 @@ class PRESS_LMS_Actions
     public static function handle_enroll()
     {
         $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
+        $fallback_url = wp_get_referer() ?: '';
 
         if (!$course_id || get_post_type($course_id) !== 'press_course') {
-            wp_die('Curso inválido.');
+            self::redirect_to_enrollment_notice('enroll_invalid_request', 0, $fallback_url);
         }
 
         if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'press_lms_enroll_' . $course_id)) {
-            wp_die('Nonce inválido.');
+            self::redirect_to_enrollment_notice('enroll_invalid_request', $course_id, $fallback_url);
         }
 
         if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
-            wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
+            self::redirect_to_enrollment_notice('enroll_course_paused', $course_id, $fallback_url);
         }
 
         if (!class_exists('WooCommerce') || !function_exists('wc_get_page_permalink')) {
-            wp_die('WooCommerce é obrigatório para matrícula.');
+            self::redirect_to_enrollment_notice('enroll_woo_required', $course_id, $fallback_url);
         }
 
         // Unauthenticated users must go through account login or registration first.
@@ -303,15 +457,15 @@ class PRESS_LMS_Actions
         $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
 
         if (!$course_id || get_post_type($course_id) !== 'press_course') {
-            wp_die('Curso inválido.');
+            self::redirect_to_enrollment_notice('enroll_invalid_request');
         }
 
         if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'press_lms_enroll_continue_' . $course_id)) {
-            wp_die('Nonce inválido.');
+            self::redirect_to_enrollment_notice('enroll_invalid_request', $course_id);
         }
 
         if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
-            wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
+            self::redirect_to_enrollment_notice('enroll_course_paused', $course_id);
         }
 
         if (!is_user_logged_in()) {
@@ -320,7 +474,7 @@ class PRESS_LMS_Actions
                 wp_safe_redirect(wc_get_page_permalink('myaccount'));
                 exit;
             }
-            wp_die('Você precisa estar logado.');
+            self::redirect_to_enrollment_notice('enroll_login_required', $course_id);
         }
 
         self::do_enroll_and_redirect_to_checkout(get_current_user_id(), $course_id);
@@ -357,11 +511,11 @@ class PRESS_LMS_Actions
     private static function do_enroll_and_redirect_to_checkout($user_id, $course_id)
     {
         if (!class_exists('WooCommerce') || !function_exists('WC') || !function_exists('wc_get_checkout_url')) {
-            wp_die('WooCommerce é obrigatório para matrícula.');
+            self::redirect_to_enrollment_notice('enroll_woo_required', (int) $course_id);
         }
 
         if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused((int) $course_id)) {
-            wp_die('Este curso está pausado no momento e não aceita novas matrículas.');
+            self::redirect_to_enrollment_notice('enroll_course_paused', (int) $course_id);
         }
 
         // Create the pending enrollment before checkout.
@@ -369,13 +523,13 @@ class PRESS_LMS_Actions
 
         $product_id = PRESS_LMS_Enrollments::get_course_product_id((int)$course_id);
         if (!$product_id || !get_post($product_id)) {
-            wp_die('Produto do curso não encontrado. Verifique se o curso tem preço e se o Woo gerou o produto.');
+            self::redirect_to_enrollment_notice('enroll_product_missing', (int) $course_id);
         }
 
         self::ensure_woo_cart_ready();
 
         if (!WC()->cart) {
-            wp_die('Carrinho WooCommerce não inicializado.');
+            self::redirect_to_enrollment_notice('enroll_cart_unavailable', (int) $course_id);
         }
 
         // Replace cart contents so checkout contains only the selected course.
@@ -441,8 +595,8 @@ class PRESS_LMS_Actions
 
         if (
             class_exists('PRESS_LMS_Enrollments') &&
-            method_exists('PRESS_LMS_Enrollments', 'get_active_enrollments') &&
-            !empty(PRESS_LMS_Enrollments::get_active_enrollments((int) $user->ID))
+            method_exists('PRESS_LMS_Enrollments', 'has_any_enrollment') &&
+            PRESS_LMS_Enrollments::has_any_enrollment((int) $user->ID)
         ) {
             return self::get_student_dashboard_url('courses');
         }

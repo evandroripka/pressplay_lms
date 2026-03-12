@@ -3,6 +3,8 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Frontend
 {
+    private static bool $theme_compat_mode = false;
+
     public static function init()
     {
         add_shortcode('press_register', [__CLASS__, 'shortcode_register']);
@@ -12,6 +14,11 @@ class PRESS_LMS_Frontend
     {
         status_header(200);
         nocache_headers();
+
+        if (self::$theme_compat_mode) {
+            return;
+        }
+
         echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
         echo '<title>' . esc_html($title) . '</title>';
         wp_head();
@@ -20,8 +27,159 @@ class PRESS_LMS_Frontend
 
     public static function footer()
     {
+        if (self::$theme_compat_mode) {
+            return;
+        }
+
         wp_footer();
         echo '</body></html>';
+    }
+
+    public static function is_theme_compat_request(): bool
+    {
+        $context = self::get_current_frontend_route();
+
+        return in_array((string) ($context['type'] ?? ''), ['lesson', 'course', 'catalog', 'student', 'register'], true);
+    }
+
+    public static function get_current_frontend_route(): array
+    {
+        $course_slug = sanitize_title((string) get_query_var('press_course_slug'));
+        $lesson_slug = sanitize_title((string) get_query_var('press_lesson_slug'));
+        $student_certificate = sanitize_title((string) get_query_var('press_student_certificate'));
+        $my_courses = (bool) get_query_var('press_my_courses');
+        $course_archive = (bool) get_query_var('press_course_archive');
+        $register = (bool) get_query_var('press_register');
+        $student_area = sanitize_key((string) get_query_var('press_student_area'));
+
+        if ($course_slug !== '' && $lesson_slug !== '') {
+            return [
+                'type' => 'lesson',
+                'course_slug' => $course_slug,
+                'lesson_slug' => $lesson_slug,
+            ];
+        }
+
+        if ($course_slug !== '') {
+            return [
+                'type' => 'course',
+                'course_slug' => $course_slug,
+            ];
+        }
+
+        if ($student_certificate !== '') {
+            return [
+                'type' => 'certificate',
+                'course_slug' => $student_certificate,
+            ];
+        }
+
+        if ($course_archive) {
+            return ['type' => 'catalog'];
+        }
+
+        if ($my_courses) {
+            return [
+                'type' => 'student',
+                'student_area' => $student_area,
+            ];
+        }
+
+        if ($register) {
+            return ['type' => 'register'];
+        }
+
+        return ['type' => ''];
+    }
+
+    public static function get_theme_compat_page_title(): string
+    {
+        $context = self::get_current_frontend_route();
+        $route_type = (string) ($context['type'] ?? '');
+
+        if ($route_type === 'student') {
+            return self::get_student_area_page_title(self::get_student_dashboard_tab());
+        }
+
+        if ($route_type === 'catalog') {
+            return 'Cursos - Pressplay';
+        }
+
+        if ($route_type === 'register') {
+            return 'Cadastro - Pressplay';
+        }
+
+        if ($route_type === 'course') {
+            $course = get_page_by_path((string) ($context['course_slug'] ?? ''), OBJECT, 'press_course');
+
+            return $course instanceof WP_Post
+                ? sprintf('%s - Pressplay', (string) $course->post_title)
+                : 'Curso - Pressplay';
+        }
+
+        if ($route_type === 'lesson') {
+            $course = get_page_by_path((string) ($context['course_slug'] ?? ''), OBJECT, 'press_course');
+            $lesson = $course instanceof WP_Post
+                ? self::find_lesson_for_course((string) ($context['lesson_slug'] ?? ''), (int) $course->ID)
+                : null;
+
+            if ($course instanceof WP_Post && $lesson instanceof WP_Post) {
+                return sprintf('%s - %s', (string) $lesson->post_title, (string) $course->post_title);
+            }
+
+            return 'Aula - Pressplay';
+        }
+
+        return 'Pressplay';
+    }
+
+    public static function render_theme_compat_content(): void
+    {
+        $context = self::get_current_frontend_route();
+        $route_type = (string) ($context['type'] ?? '');
+
+        if (!in_array($route_type, ['lesson', 'course', 'catalog', 'student', 'register'], true)) {
+            return;
+        }
+
+        $previous_mode = self::$theme_compat_mode;
+        self::$theme_compat_mode = true;
+
+        try {
+            self::render_frontend_route($context);
+        } finally {
+            self::$theme_compat_mode = $previous_mode;
+        }
+    }
+
+    private static function render_frontend_route(array $context): void
+    {
+        $route_type = (string) ($context['type'] ?? '');
+
+        switch ($route_type) {
+            case 'lesson':
+                self::render_lesson_by_slug(
+                    (string) ($context['course_slug'] ?? ''),
+                    (string) ($context['lesson_slug'] ?? '')
+                );
+                return;
+
+            case 'course':
+                self::render_course_by_slug((string) ($context['course_slug'] ?? ''));
+                return;
+
+            case 'catalog':
+                self::render_course_archive();
+                return;
+
+            case 'student':
+                self::render_my_courses();
+                return;
+
+            case 'register':
+                self::render_register();
+                return;
+        }
     }
 
     public static function render_register()
@@ -117,7 +275,7 @@ class PRESS_LMS_Frontend
     {
         $areas = [
             'catalog' => [
-                'label' => 'Showroom de cursos',
+                'label' => 'Cursos',
                 'path' => '/cursos/',
                 'page_title' => 'Cursos - Pressplay',
                 'menu' => true,
@@ -139,14 +297,14 @@ class PRESS_LMS_Frontend
             ],
             'profile' => [
                 'label' => 'Meu perfil',
-                'path' => '/meus-cursos/perfil/',
+                'path' => '/perfil/',
                 'page_title' => 'Meu perfil - Pressplay',
                 'menu' => true,
                 'student_nav' => true,
             ],
             'password' => [
                 'label' => 'Trocar senha',
-                'path' => '/meus-cursos/trocar-senha/',
+                'path' => '/perfil/trocar-senha/',
                 'page_title' => 'Trocar senha - Pressplay',
                 'menu' => true,
                 'student_nav' => true,
@@ -209,11 +367,11 @@ class PRESS_LMS_Frontend
             return 'certificates';
         }
 
-        if (preg_match('#^meus-cursos/perfil/?$#', $path)) {
+        if (preg_match('#^(perfil|meus-cursos/perfil)/?$#', $path)) {
             return 'profile';
         }
 
-        if (preg_match('#^meus-cursos/trocar-senha/?$#', $path)) {
+        if (preg_match('#^(perfil/trocar-senha|meus-cursos/trocar-senha)/?$#', $path)) {
             return 'password';
         }
 
@@ -290,9 +448,41 @@ class PRESS_LMS_Frontend
                 'type' => 'success',
                 'message' => 'Sua senha foi atualizada com sucesso.',
             ],
+            'profile_updated' => [
+                'type' => 'success',
+                'message' => 'Seu perfil foi atualizado com sucesso.',
+            ],
             'password_current_invalid' => [
                 'type' => 'error',
                 'message' => 'A senha atual informada não confere.',
+            ],
+            'profile_name_invalid' => [
+                'type' => 'error',
+                'message' => 'Informe seu nome completo.',
+            ],
+            'profile_phone_invalid' => [
+                'type' => 'error',
+                'message' => 'Informe um telefone válido com DDD.',
+            ],
+            'profile_email_invalid' => [
+                'type' => 'error',
+                'message' => 'Informe um e-mail válido.',
+            ],
+            'profile_email_exists' => [
+                'type' => 'error',
+                'message' => 'Este e-mail já está em uso por outra conta.',
+            ],
+            'profile_avatar_invalid' => [
+                'type' => 'error',
+                'message' => 'Não foi possível enviar a foto de perfil. Tente novamente com uma imagem válida.',
+            ],
+            'profile_nonce_invalid' => [
+                'type' => 'error',
+                'message' => 'Não foi possível validar a atualização do perfil. Tente novamente.',
+            ],
+            'profile_update_failed' => [
+                'type' => 'error',
+                'message' => 'Não foi possível atualizar o seu perfil agora.',
             ],
             'password_mismatch' => [
                 'type' => 'error',
@@ -321,6 +511,43 @@ class PRESS_LMS_Frontend
             'certificate_forbidden' => [
                 'type' => 'error',
                 'message' => 'Você não tem permissão para acessar esse certificado.',
+            ],
+        ];
+
+        return $map[$notice] ?? null;
+    }
+
+    private static function get_course_frontend_notice(?string $notice): ?array
+    {
+        $notice = sanitize_key((string) $notice);
+        if ($notice === '') {
+            return null;
+        }
+
+        $map = [
+            'enroll_invalid_request' => [
+                'type' => 'error',
+                'message' => 'Não foi possível iniciar a matrícula. Tente novamente.',
+            ],
+            'enroll_course_paused' => [
+                'type' => 'error',
+                'message' => 'Este curso está pausado no momento e não aceita novas matrículas.',
+            ],
+            'enroll_woo_required' => [
+                'type' => 'error',
+                'message' => 'O WooCommerce é obrigatório para concluir esta matrícula.',
+            ],
+            'enroll_product_missing' => [
+                'type' => 'error',
+                'message' => 'O produto deste curso ainda não está disponível para compra.',
+            ],
+            'enroll_cart_unavailable' => [
+                'type' => 'error',
+                'message' => 'Não foi possível iniciar o carrinho da matrícula agora. Tente novamente.',
+            ],
+            'enroll_login_required' => [
+                'type' => 'error',
+                'message' => 'Faça login para concluir a matrícula.',
             ],
         ];
 
@@ -402,7 +629,12 @@ class PRESS_LMS_Frontend
             'email' => (string) $user->user_email,
             'phone' => $student ? (string) ($student->phone_raw ?? '') : '',
             'registered_at' => $registered_at,
-            'avatar_url' => (string) get_avatar_url($user_id, ['size' => 96]),
+            'avatar_url' => class_exists('PRESS_LMS_Helpers')
+                ? PRESS_LMS_Helpers::get_student_avatar_url($user_id, 96)
+                : (string) get_avatar_url($user_id, ['size' => 96]),
+            'has_custom_avatar' => class_exists('PRESS_LMS_Helpers')
+                ? PRESS_LMS_Helpers::has_student_avatar($user_id)
+                : false,
             'initials' => strtoupper((string) $initials),
         ];
     }
@@ -420,13 +652,12 @@ class PRESS_LMS_Frontend
         $course_url = home_url('/curso/' . $course_slug . '/');
         $lessons = PRESS_LMS_Helpers::get_course_lessons($course_id, ['publish']);
         $first_lesson = !empty($lessons[0]) && $lessons[0] instanceof WP_Post ? $lessons[0] : null;
-        $next_lesson = class_exists('PRESS_LMS_Progress')
+        $has_access = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::is_enrollment_currently_active($enrollment)
+            : false;
+        $next_lesson = ($has_access && class_exists('PRESS_LMS_Progress'))
             ? PRESS_LMS_Progress::get_next_lesson_for_user($user_id, $course_id)
             : $first_lesson;
-
-        $resume_url = $next_lesson instanceof WP_Post
-            ? home_url('/curso/' . $course_slug . '/aula/' . $next_lesson->post_name . '/')
-            : $course_url;
 
         $progress = class_exists('PRESS_LMS_Progress')
             ? PRESS_LMS_Progress::get_course_progress_summary($user_id, $course_id)
@@ -464,15 +695,27 @@ class PRESS_LMS_Frontend
             ? PRESS_LMS_Enrollments::get_course_access_label($course_id)
             : '';
         $access_expires_label = class_exists('PRESS_LMS_Enrollments')
-            ? PRESS_LMS_Enrollments::format_enrollment_expires_at((string) ($enrollment->expires_at ?? ''))
+            ? PRESS_LMS_Enrollments::get_enrollment_access_summary($enrollment)
             : '';
+        $access_status_label = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::get_enrollment_status_label($enrollment)
+            : 'Desconhecido';
+        $resume_url = $has_access && $next_lesson instanceof WP_Post
+            ? home_url('/curso/' . $course_slug . '/aula/' . $next_lesson->post_name . '/')
+            : $course_url;
+        $resume_label = $has_access
+            ? ($is_completed ? 'Revisar curso' : 'Continuar curso')
+            : 'Ver curso';
+        $learning_status_label = $is_completed
+            ? 'Concluído'
+            : ((int) ($progress['completed'] ?? 0) > 0 ? 'Em andamento' : 'Não iniciado');
 
         return [
             'course_id' => $course_id,
             'course_title' => (string) $course->post_title,
             'course_url' => $course_url,
             'resume_url' => $resume_url,
-            'resume_label' => $is_completed ? 'Revisar curso' : 'Continuar curso',
+            'resume_label' => $resume_label,
             'thumbnail_url' => (string) $thumbnail_url,
             'teacher_name' => $teacher_name,
             'purchased_at' => !empty($enrollment->purchased_at) ? date_i18n('d/m/Y', strtotime((string) $enrollment->purchased_at)) : '',
@@ -481,10 +724,13 @@ class PRESS_LMS_Frontend
             'duration_label' => $duration_label,
             'access_label' => $course_access_label,
             'access_expires_label' => $access_expires_label,
+            'access_status_label' => $access_status_label,
+            'has_access' => $has_access,
             'progress_percent' => (int) ($progress['percent'] ?? 0),
             'completed_lessons' => (int) ($progress['completed'] ?? 0),
             'total_lessons' => (int) ($progress['total'] ?? 0),
-            'status_label' => $is_completed ? 'Concluído' : 'Em andamento',
+            'status_label' => $access_status_label,
+            'learning_status_label' => $learning_status_label,
             'certificate_available' => $is_completed,
             'certificate_url' => $certificate_url,
             'completed_at' => $completed_at_raw ? date_i18n('d/m/Y', strtotime($completed_at_raw)) : '',
@@ -494,13 +740,13 @@ class PRESS_LMS_Frontend
     private static function get_student_dashboard_data(int $user_id): array
     {
         $courses = [];
-        $certificates = [];
         $total_duration_seconds = 0;
         $total_completed_lessons = 0;
         $total_lessons = 0;
+        $active_courses = 0;
 
         $enrollments = class_exists('PRESS_LMS_Enrollments')
-            ? PRESS_LMS_Enrollments::get_active_enrollments($user_id)
+            ? PRESS_LMS_Enrollments::get_user_enrollments($user_id, ['include_pending' => true])
             : [];
 
         foreach ($enrollments as $enrollment) {
@@ -510,27 +756,24 @@ class PRESS_LMS_Frontend
             }
 
             $courses[] = $course_data;
+            if (!empty($course_data['has_access'])) {
+                $active_courses++;
+            }
             $total_duration_seconds += (int) ($course_data['duration_seconds'] ?? 0);
             $total_completed_lessons += (int) ($course_data['completed_lessons'] ?? 0);
             $total_lessons += (int) ($course_data['total_lessons'] ?? 0);
-
-            if (!empty($course_data['certificate_available'])) {
-                $certificates[] = [
-                    'course_id' => (int) $course_data['course_id'],
-                    'course_title' => (string) $course_data['course_title'],
-                    'thumbnail_url' => (string) $course_data['thumbnail_url'],
-                    'completed_at' => (string) $course_data['completed_at'],
-                    'certificate_url' => (string) $course_data['certificate_url'],
-                    'course_url' => (string) $course_data['course_url'],
-                ];
-            }
         }
+
+        $certificates = class_exists('PRESS_LMS_Certificate')
+            ? PRESS_LMS_Certificate::get_available_certificates_for_user($user_id)
+            : [];
 
         return [
             'courses' => $courses,
             'certificates' => $certificates,
             'stats' => [
-                'active_courses' => count($courses),
+                'active_courses' => $active_courses,
+                'library_courses' => count($courses),
                 'available_certificates' => count($certificates),
                 'completed_lessons' => $total_completed_lessons,
                 'total_lessons' => $total_lessons,
@@ -894,6 +1137,7 @@ class PRESS_LMS_Frontend
         $first_lesson_url_var = $first_lesson_url;
         $product_id_var       = PRESS_LMS_Enrollments::get_course_product_id((int) $course->ID);
         $course_access_label_var = $course_access_label;
+        $course_notice_var = self::get_course_frontend_notice($_GET['notice'] ?? '');
 
         $template = trailingslashit(PRESS_LMS_PATH) . 'templates/frontend/single-press_course.php';
 

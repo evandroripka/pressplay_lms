@@ -40,6 +40,12 @@ class PRESS_LMS_Progress
 
         $table = PRESS_LMS_Database::table('progress');
         $now   = current_time('mysql');
+        $should_check_course_completion = (int) $completed === 1 && class_exists('PRESS_LMS_Mailer');
+        $was_course_completed = false;
+
+        if ($should_check_course_completion) {
+            $was_course_completed = self::get_course_progress_percent($user_id, $course_id) >= 100;
+        }
 
         $existing = $wpdb->get_row(
             $wpdb->prepare(
@@ -83,6 +89,14 @@ class PRESS_LMS_Progress
                 'completed_at'    => $completed ? $now : null,
                 'updated_at'      => $now,
             ]);
+        }
+
+        if (
+            $should_check_course_completion &&
+            !$was_course_completed &&
+            self::get_course_progress_percent($user_id, $course_id) >= 100
+        ) {
+            PRESS_LMS_Mailer::maybe_send_course_completed_email($user_id, $course_id);
         }
     }
 

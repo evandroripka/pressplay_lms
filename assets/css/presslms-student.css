@@ -382,6 +382,24 @@
   gap: 10px;
 }
 
+.presslms-student-avatar-editor {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.presslms-student-avatar--editor {
+  width: 84px;
+  height: 84px;
+}
+
+.presslms-student-avatar-editor__content {
+  display: grid;
+  gap: 8px;
+}
+
 .presslms-student-form__label {
   color: var(--pl-primary);
   font-size: 13px;
@@ -403,6 +421,19 @@
 .presslms-student-form__input:focus {
   border-color: rgba(30, 58, 138, 0.32);
   box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.08);
+}
+
+.presslms-student-form__input--file {
+  height: auto;
+  padding: 10px 12px;
+}
+
+.presslms-student-form__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pl-muted);
+  font-size: 14px;
 }
 
 @media (max-width: 1080px) {
@@ -455,6 +486,10 @@
   .presslms-student-course__thumb,
   .presslms-student-certificate__thumb {
     min-height: 180px;
+  }
+
+  .presslms-student-avatar-editor {
+    grid-template-columns: 1fr;
   }
 
   .presslms-student-progress__legend {

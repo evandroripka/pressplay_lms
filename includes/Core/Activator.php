@@ -26,6 +26,9 @@ class PRESS_LMS_Activator
             PRESS_LMS_Woo::register_account_endpoint();
         }
 
+        update_option('press_lms_backup_users_can_register', get_option('users_can_register'));
+        update_option('press_lms_backup_default_role', get_option('default_role'));
+
         // Enable public registration for the student flow.
         update_option('users_can_register', 1);
 

@@ -18,6 +18,9 @@ class PRESS_LMS_Woo
         // Activate enrollments once the order is paid or processed.
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_completed'], 10, 1);
         add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);
+        add_action('woocommerce_order_status_cancelled', [__CLASS__, 'handle_order_invalidated'], 10, 2);
+        add_action('woocommerce_order_status_failed', [__CLASS__, 'handle_order_invalidated'], 10, 2);
+        add_action('woocommerce_order_status_refunded', [__CLASS__, 'handle_order_invalidated'], 10, 2);
         add_filter('woocommerce_is_purchasable', [__CLASS__, 'filter_is_purchasable'], 10, 2);
         add_filter('woocommerce_is_sold_individually', [__CLASS__, 'filter_is_sold_individually'], 10, 2);
         add_filter('woocommerce_add_to_cart_validation', [__CLASS__, 'validate_add_to_cart'], 10, 6);
@@ -44,7 +47,7 @@ class PRESS_LMS_Woo
             return PRESS_LMS_Frontend::get_student_area_url('profile');
         }
 
-        return home_url('/meus-cursos/perfil/');
+        return home_url('/perfil/');
     }
 
     public static function maybe_redirect_account_endpoint(): void
@@ -114,6 +117,7 @@ class PRESS_LMS_Woo
                     continue;
                 }
                 PRESS_LMS_Enrollments::get_or_create_pending($user_id, $course_id, 'woocommerce');
+                PRESS_LMS_Enrollments::attach_order_to_pending_enrollment($user_id, $course_id, (int) $order_id, 'woocommerce');
             }
         }
     }
@@ -144,6 +148,40 @@ class PRESS_LMS_Woo
                 }
                 PRESS_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int)$order_id, 'woocommerce');
             }
+        }
+    }
+
+    /**
+     * Revoke access when the linked WooCommerce order becomes invalid.
+     */
+    public static function handle_order_invalidated($order_id, $order = null): void
+    {
+        if (!class_exists('WooCommerce')) return;
+
+        if (!$order instanceof WC_Order) {
+            $order = wc_get_order($order_id);
+        }
+        if (!$order) return;
+
+        $user_id = (int) $order->get_user_id();
+        if ($user_id <= 0) return;
+
+        $status = sanitize_key((string) $order->get_status());
+        $enrollment_status = in_array($status, ['cancelled', 'failed', 'refunded'], true)
+            ? $status
+            : 'cancelled';
+
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if (!$product) continue;
+
+            $product_id = (int) $product->get_id();
+            $course_id = self::get_course_id_from_product_id($product_id);
+            if ($course_id <= 0) {
+                continue;
+            }
+
+            PRESS_LMS_Enrollments::deactivate_enrollment($user_id, $course_id, $enrollment_status, (int) $order_id);
         }
     }
 
@@ -342,6 +380,15 @@ class PRESS_LMS_Woo
         $course_id = self::get_course_id_from_product_id((int) $product_id);
         if ($course_id <= 0) {
             return $passed;
+        }
+
+        if (
+            is_user_logged_in() &&
+            class_exists('PRESS_LMS_Enrollments') &&
+            PRESS_LMS_Enrollments::has_active_enrollment(get_current_user_id(), $course_id)
+        ) {
+            wc_add_notice('Você já tem acesso ativo a este curso.', 'notice');
+            return false;
         }
 
         if ((int) $quantity > 1) {

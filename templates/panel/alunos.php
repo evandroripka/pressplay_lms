@@ -8,7 +8,10 @@ $filter_course = (int) ($filter_course ?? 0);
 $filter_status = (string) ($filter_status ?? '');
 $filter_search = (string) ($filter_search ?? '');
 $filter_sort   = (string) ($filter_sort ?? 'date_desc');
-$now_ts = current_time('timestamp');
+$panel_page_title = (string) ($panel_page_title ?? 'Alunos');
+$panel_page_subtitle = (string) ($panel_page_subtitle ?? 'Gerencie alunos, matrículas e progresso por curso.');
+$panel_page_slug = (string) ($panel_page_slug ?? 'press-lms-students');
+$panel_notice = is_array($panel_notice ?? null) ? $panel_notice : null;
 
 function presslms_admin_student_progress_percent($completed, $total)
 {
@@ -24,14 +27,30 @@ function presslms_admin_student_progress_percent($completed, $total)
     <div class="presslms-panel">
         <div class="presslms-panel__header">
             <div>
-                <h1 class="title is-3 mb-2">Alunos</h1>
-                <p class="subtitle is-6 mb-0">Gerencie alunos, matrículas e progresso por curso.</p>
+                <h1 class="title is-3 mb-2"><?php echo esc_html($panel_page_title); ?></h1>
+                <p class="subtitle is-6 mb-0"><?php echo esc_html($panel_page_subtitle); ?></p>
             </div>
         </div>
 
+        <?php if ($panel_notice): ?>
+            <?php
+            $notice_type = (string) ($panel_notice['type'] ?? 'info');
+            $notice_class_map = [
+                'success' => 'is-success',
+                'warning' => 'is-warning',
+                'error' => 'is-danger',
+                'info' => 'is-info',
+            ];
+            $notice_class = $notice_class_map[$notice_type] ?? $notice_class_map['info'];
+            ?>
+            <div class="notification <?php echo esc_attr($notice_class); ?> is-light mb-5">
+                <?php echo esc_html((string) ($panel_notice['message'] ?? '')); ?>
+            </div>
+        <?php endif; ?>
+
         <div class="box presslms-box presslms-box--filters">
             <form method="get" class="presslms-filters-form">
-                <input type="hidden" name="page" value="press-lms-students">
+                <input type="hidden" name="page" value="<?php echo esc_attr($panel_page_slug); ?>">
 
                 <div class="columns is-multiline">
                     <div class="column is-12">
@@ -66,6 +85,10 @@ function presslms_admin_student_progress_percent($completed, $total)
                                         <option value="pending" <?php selected($filter_status, 'pending'); ?>>Pendente</option>
                                         <option value="active" <?php selected($filter_status, 'active'); ?>>Ativo</option>
                                         <option value="expired" <?php selected($filter_status, 'expired'); ?>>Expirado</option>
+                                        <option value="blocked" <?php selected($filter_status, 'blocked'); ?>>Bloqueado</option>
+                                        <option value="cancelled" <?php selected($filter_status, 'cancelled'); ?>>Cancelado</option>
+                                        <option value="failed" <?php selected($filter_status, 'failed'); ?>>Pagamento falhou</option>
+                                        <option value="refunded" <?php selected($filter_status, 'refunded'); ?>>Reembolsado</option>
                                     </select>
                                 </div>
                             </div>
@@ -100,7 +123,7 @@ function presslms_admin_student_progress_percent($completed, $total)
                     <div class="column is-12">
                         <div class="buttons">
                             <button type="submit" class="button is-link presslms-btn">Aplicar filtros</button>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=press-lms-students')); ?>" class="button is-light presslms-btn">Limpar</a>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=' . $panel_page_slug)); ?>" class="button is-light presslms-btn">Limpar</a>
                         </div>
                     </div>
                 </div>
@@ -143,21 +166,45 @@ function presslms_admin_student_progress_percent($completed, $total)
                                     (int) $student->completed_lessons,
                                     (int) $student->total_lessons
                                 );
-
-                                $status_class = 'is-light';
-                                $status_label = 'Desconhecido';
-                                $is_expired = !empty($student->expires_at) && strtotime((string) $student->expires_at) <= $now_ts;
-
-                                if ($student->status === 'active' && $is_expired) {
-                                    $status_class = 'is-danger is-light';
-                                    $status_label = 'Expirado';
-                                } elseif ($student->status === 'active') {
-                                    $status_class = 'is-success is-light';
-                                    $status_label = 'Ativo';
-                                } elseif ($student->status === 'pending') {
-                                    $status_class = 'is-warning is-light';
-                                    $status_label = 'Pendente';
-                                }
+                                $status_key = class_exists('PRESS_LMS_Enrollments')
+                                    ? PRESS_LMS_Enrollments::get_enrollment_status_key($student)
+                                    : sanitize_key((string) ($student->status ?? ''));
+                                $status_class = class_exists('PRESS_LMS_Enrollments')
+                                    ? PRESS_LMS_Enrollments::get_enrollment_status_class($student)
+                                    : 'is-light';
+                                $status_label = class_exists('PRESS_LMS_Enrollments')
+                                    ? PRESS_LMS_Enrollments::get_enrollment_status_label($student)
+                                    : 'Desconhecido';
+                                $access_summary = class_exists('PRESS_LMS_Enrollments')
+                                    ? PRESS_LMS_Enrollments::get_enrollment_access_summary($student)
+                                    : 'Status indisponível';
+                                $manage_nonce = 'press_lms_manage_enrollment_' . (int) $student->id;
+                                $action_base_args = [
+                                    'action' => 'press_lms_manage_enrollment',
+                                    'enrollment_id' => (int) $student->id,
+                                    'page_slug' => $panel_page_slug,
+                                ];
+                                $block_url = wp_nonce_url(
+                                    add_query_arg($action_base_args + ['enrollment_action' => 'block'], admin_url('admin-post.php')),
+                                    $manage_nonce
+                                );
+                                $reactivate_url = wp_nonce_url(
+                                    add_query_arg($action_base_args + ['enrollment_action' => 'reactivate'], admin_url('admin-post.php')),
+                                    $manage_nonce
+                                );
+                                $extend_30_url = wp_nonce_url(
+                                    add_query_arg($action_base_args + ['enrollment_action' => 'extend_30_days'], admin_url('admin-post.php')),
+                                    $manage_nonce
+                                );
+                                $extend_90_url = wp_nonce_url(
+                                    add_query_arg($action_base_args + ['enrollment_action' => 'extend_90_days'], admin_url('admin-post.php')),
+                                    $manage_nonce
+                                );
+                                $extend_year_url = wp_nonce_url(
+                                    add_query_arg($action_base_args + ['enrollment_action' => 'extend_1_year'], admin_url('admin-post.php')),
+                                    $manage_nonce
+                                );
+                                $can_extend = !empty($student->expires_at) && in_array($status_key, ['active', 'expired'], true);
                                 ?>
                                 <tr>
                                     <td>
@@ -210,16 +257,7 @@ function presslms_admin_student_progress_percent($completed, $total)
                                             : '—';
                                         ?>
                                         <div class="presslms-muted">
-                                            <?php
-                                            if ($student->status === 'active' && empty($student->expires_at)) {
-                                                echo 'Vitalício';
-                                            } elseif (!empty($student->expires_at)) {
-                                                echo ($is_expired ? 'Expirou em ' : 'Válido até ')
-                                                    . esc_html(date_i18n('d/m/Y', strtotime((string) $student->expires_at)));
-                                            } else {
-                                                echo '—';
-                                            }
-                                            ?>
+                                            <?php echo esc_html($access_summary); ?>
                                         </div>
                                     </td>
 
@@ -231,7 +269,16 @@ function presslms_admin_student_progress_percent($completed, $total)
                                                 data-user-id="<?php echo esc_attr($student->user_id); ?>"
                                                 data-student-name="<?php echo esc_attr($student->full_name ?: 'Aluno'); ?>">Alterar Senha
                                             </button>
-                                            <button type="button" class="button is-danger is-light presslms-btn-action">Bloquear Acesso</button>
+                                            <?php if ($status_key === 'active'): ?>
+                                                <a class="button is-danger is-light presslms-btn-action" href="<?php echo esc_url($block_url); ?>">Bloquear Acesso</a>
+                                            <?php else: ?>
+                                                <a class="button is-link is-light presslms-btn-action" href="<?php echo esc_url($reactivate_url); ?>">Reativar</a>
+                                            <?php endif; ?>
+                                            <?php if ($can_extend): ?>
+                                                <a class="button is-info is-light presslms-btn-action" href="<?php echo esc_url($extend_30_url); ?>">+30 dias</a>
+                                                <a class="button is-info is-light presslms-btn-action" href="<?php echo esc_url($extend_90_url); ?>">+90 dias</a>
+                                                <a class="button is-info is-light presslms-btn-action" href="<?php echo esc_url($extend_year_url); ?>">+1 ano</a>
+                                            <?php endif; ?>
                                             <a
   class="button is-success is-light presslms-btn-action"
   target="_blank"

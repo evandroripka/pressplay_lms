@@ -3,6 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Helpers {
     private static $lesson_thumbnail_cache = [];
+    private const STUDENT_AVATAR_META_KEY = 'press_lms_avatar_id';
 
     public static function get_course_lessons($course_id, $post_status = ['publish']) {
         $course_id = (int) $course_id;
@@ -131,6 +132,59 @@ class PRESS_LMS_Helpers {
         }
         // Otherwise, assume a Brazilian number.
         return '+55' . $digits;
+    }
+
+    public static function get_student_avatar_id(int $user_id): int
+    {
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return 0;
+        }
+
+        return (int) get_user_meta($user_id, self::STUDENT_AVATAR_META_KEY, true);
+    }
+
+    public static function has_student_avatar(int $user_id): bool
+    {
+        return self::get_student_avatar_id($user_id) > 0;
+    }
+
+    public static function get_student_avatar_url(int $user_id, $size = 96): string
+    {
+        $avatar_id = self::get_student_avatar_id($user_id);
+
+        if ($avatar_id > 0) {
+            $custom_avatar_url = wp_get_attachment_image_url($avatar_id, is_string($size) ? $size : 'thumbnail');
+            if ($custom_avatar_url) {
+                return (string) $custom_avatar_url;
+            }
+        }
+
+        $avatar_args = [];
+        if (is_numeric($size)) {
+            $avatar_args['size'] = (int) $size;
+        } elseif (is_string($size) && $size !== '') {
+            $avatar_args['size'] = 96;
+        }
+
+        return (string) get_avatar_url($user_id, $avatar_args);
+    }
+
+    public static function set_student_avatar_id(int $user_id, int $attachment_id): void
+    {
+        $user_id = (int) $user_id;
+        $attachment_id = (int) $attachment_id;
+
+        if ($user_id <= 0) {
+            return;
+        }
+
+        if ($attachment_id > 0) {
+            update_user_meta($user_id, self::STUDENT_AVATAR_META_KEY, $attachment_id);
+            return;
+        }
+
+        delete_user_meta($user_id, self::STUDENT_AVATAR_META_KEY);
     }
 
     public static function upsert_student_profile($user_id, $full_name, $phone) {

@@ -12,6 +12,7 @@ class PRESS_LMS_Settings
         add_action('admin_menu', [__CLASS__, 'menu']);
         add_action('admin_init', [__CLASS__, 'register']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_panel_assets']);
+        add_action('admin_post_press_lms_manage_enrollment', [__CLASS__, 'handle_manage_enrollment']);
     }
 
     public static function menu()
@@ -47,6 +48,14 @@ class PRESS_LMS_Settings
             'manage_options',
             'press-lms-students',
             [__CLASS__, 'page_students']
+        );
+        add_submenu_page(
+            'press-lms',
+            'Matrículas',
+            'Matrículas',
+            'manage_options',
+            'press-lms-enrollments',
+            [__CLASS__, 'page_enrollments']
         );
         add_submenu_page(
             'press-lms',
@@ -189,10 +198,59 @@ class PRESS_LMS_Settings
         echo '</div>';
     }
 
-    public static function page_students()
+    private static function get_admin_panel_url(string $page_slug, array $args = []): string
     {
-        if (!current_user_can('manage_options')) return;
+        $url = admin_url('admin.php?page=' . $page_slug);
+        return !empty($args) ? add_query_arg($args, $url) : $url;
+    }
 
+    private static function get_admin_panel_notice(?string $notice): ?array
+    {
+        $notice = sanitize_key((string) $notice);
+        if ($notice === '') {
+            return null;
+        }
+
+        $map = [
+            'enrollment_blocked' => [
+                'type' => 'warning',
+                'message' => 'O acesso da matrícula foi bloqueado.',
+            ],
+            'enrollment_reactivated' => [
+                'type' => 'success',
+                'message' => 'A matrícula foi reativada com sucesso.',
+            ],
+            'enrollment_extended' => [
+                'type' => 'success',
+                'message' => 'A validade da matrícula foi prorrogada.',
+            ],
+            'enrollment_invalid' => [
+                'type' => 'error',
+                'message' => 'Não foi possível localizar a matrícula solicitada.',
+            ],
+            'enrollment_action_invalid' => [
+                'type' => 'error',
+                'message' => 'A ação solicitada para a matrícula é inválida.',
+            ],
+            'enrollment_permission_denied' => [
+                'type' => 'error',
+                'message' => 'Você não tem permissão para gerenciar esta matrícula.',
+            ],
+            'enrollment_nonce_invalid' => [
+                'type' => 'error',
+                'message' => 'Não foi possível validar a ação. Tente novamente.',
+            ],
+            'enrollment_update_failed' => [
+                'type' => 'error',
+                'message' => 'Não foi possível atualizar a matrícula.',
+            ],
+        ];
+
+        return $map[$notice] ?? null;
+    }
+
+    private static function get_admin_enrollment_panel_data(): array
+    {
         global $wpdb;
 
         $table_students    = PRESS_LMS_Database::table('students');
@@ -351,19 +409,130 @@ class PRESS_LMS_Settings
             'order'          => 'ASC',
         ]);
 
-        self::render_panel_template('alunos.php', [
-            'students'      => $students,
-            'courses'       => $courses,
+        return [
+            'students' => $students,
+            'courses' => $courses,
             'filter_course' => $filter_course,
             'filter_status' => $filter_status,
             'filter_search' => $filter_search,
-            'filter_sort'   => $filter_sort,
+            'filter_sort' => $filter_sort,
+        ];
+    }
+
+    private static function render_enrollment_panel(string $page_slug, string $title, string $subtitle): void
+    {
+        if (!current_user_can('manage_options')) return;
+
+        $data = self::get_admin_enrollment_panel_data();
+
+        self::render_panel_template('alunos.php', [
+            'students' => $data['students'],
+            'courses' => $data['courses'],
+            'filter_course' => $data['filter_course'],
+            'filter_status' => $data['filter_status'],
+            'filter_search' => $data['filter_search'],
+            'filter_sort' => $data['filter_sort'],
+            'panel_page_title' => $title,
+            'panel_page_subtitle' => $subtitle,
+            'panel_page_slug' => $page_slug,
+            'panel_notice' => self::get_admin_panel_notice($_GET['press_lms_notice'] ?? ''),
         ]);
+    }
+
+    public static function page_students()
+    {
+        self::render_enrollment_panel(
+            'press-lms-students',
+            'Alunos',
+            'Gerencie alunos, matrículas e progresso por curso.'
+        );
     }
 
     public static function page_enrollments()
     {
-        echo '<div class="wrap"><h1>Matrículas</h1><p>Listagem e gerenciamento.</p></div>';
+        self::render_enrollment_panel(
+            'press-lms-enrollments',
+            'Matrículas',
+            'Gerencie status, validade e ações operacionais das matrículas.'
+        );
+    }
+
+    public static function handle_manage_enrollment(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_safe_redirect(self::get_admin_panel_url('press-lms-students', ['press_lms_notice' => 'enrollment_permission_denied']));
+            exit;
+        }
+
+        $enrollment_id = isset($_GET['enrollment_id']) ? (int) $_GET['enrollment_id'] : 0;
+        $action_type = isset($_GET['enrollment_action']) ? sanitize_key((string) $_GET['enrollment_action']) : '';
+        $page_slug = isset($_GET['page_slug']) ? sanitize_key((string) $_GET['page_slug']) : 'press-lms-students';
+        $allowed_pages = ['press-lms-students', 'press-lms-enrollments'];
+
+        if (!in_array($page_slug, $allowed_pages, true)) {
+            $page_slug = 'press-lms-students';
+        }
+
+        if ($enrollment_id <= 0 || $action_type === '') {
+            wp_safe_redirect(self::get_admin_panel_url($page_slug, ['press_lms_notice' => 'enrollment_invalid']));
+            exit;
+        }
+
+        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce((string) $_GET['_wpnonce'], 'press_lms_manage_enrollment_' . $enrollment_id)) {
+            wp_safe_redirect(self::get_admin_panel_url($page_slug, ['press_lms_notice' => 'enrollment_nonce_invalid']));
+            exit;
+        }
+
+        $enrollment = class_exists('PRESS_LMS_Enrollments')
+            ? PRESS_LMS_Enrollments::get_enrollment_by_id($enrollment_id)
+            : null;
+
+        if (!$enrollment) {
+            wp_safe_redirect(self::get_admin_panel_url($page_slug, ['press_lms_notice' => 'enrollment_invalid']));
+            exit;
+        }
+
+        $updated = false;
+        $notice = 'enrollment_update_failed';
+
+        switch ($action_type) {
+            case 'block':
+                $updated = PRESS_LMS_Enrollments::deactivate_enrollment(
+                    (int) $enrollment->user_id,
+                    (int) $enrollment->course_id,
+                    'blocked',
+                    (int) ($enrollment->order_ref ?? 0)
+                );
+                $notice = $updated ? 'enrollment_blocked' : 'enrollment_update_failed';
+                break;
+
+            case 'reactivate':
+                $updated = PRESS_LMS_Enrollments::reactivate_enrollment_by_id($enrollment_id);
+                $notice = $updated ? 'enrollment_reactivated' : 'enrollment_update_failed';
+                break;
+
+            case 'extend_30_days':
+                $updated = PRESS_LMS_Enrollments::extend_enrollment_by_id($enrollment_id, 30, 'days');
+                $notice = $updated ? 'enrollment_extended' : 'enrollment_update_failed';
+                break;
+
+            case 'extend_90_days':
+                $updated = PRESS_LMS_Enrollments::extend_enrollment_by_id($enrollment_id, 90, 'days');
+                $notice = $updated ? 'enrollment_extended' : 'enrollment_update_failed';
+                break;
+
+            case 'extend_1_year':
+                $updated = PRESS_LMS_Enrollments::extend_enrollment_by_id($enrollment_id, 1, 'years');
+                $notice = $updated ? 'enrollment_extended' : 'enrollment_update_failed';
+                break;
+
+            default:
+                $notice = 'enrollment_action_invalid';
+                break;
+        }
+
+        wp_safe_redirect(self::get_admin_panel_url($page_slug, ['press_lms_notice' => $notice]));
+        exit;
     }
 
     public static function page_progress()
