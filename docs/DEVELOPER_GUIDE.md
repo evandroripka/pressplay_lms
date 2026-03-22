@@ -158,6 +158,13 @@ Handles:
 - order-based activation and revocation
 - WooCommerce account integration
 
+Payment compatibility strategy:
+
+- prefer WooCommerce lifecycle hooks over gateway-specific hooks
+- treat `woocommerce_payment_complete` as the primary payment-confirmation event
+- respect `wc_get_is_paid_statuses()` so custom paid statuses remain compatible
+- store the real WooCommerce gateway ID on the enrollment when it is available
+
 ### `Enrollments.php`
 
 Handles:
@@ -213,7 +220,29 @@ Template compatibility lives in `includes/Core/Templates.php`.
 
 Frontend route rendering lives in `includes/Frontend.php`.
 
-## 8. Security Checklist
+## 8. Payment Compatibility
+
+The LMS should remain gateway-agnostic.
+
+That means payment access rules should be driven by WooCommerce order events, not by a single payment plugin.
+
+Baseline rules:
+
+- pending enrollments can be created before payment is confirmed
+- access should be activated when WooCommerce confirms payment or moves the order into a paid status
+- access should be revoked only for clearly invalid states such as cancelled, failed, or refunded
+- custom gateways should work as long as they correctly update WooCommerce order state or trigger the payment-complete flow
+
+When evaluating a new gateway, verify:
+
+- the order receives a real WooCommerce payment method ID
+- the plugin updates order statuses through standard WooCommerce flows
+- delayed-confirmation gateways still move the order into a paid status after webhook confirmation
+- refunds and payment failures propagate back to WooCommerce order status changes
+
+Reference notes live in `docs/PAYMENT_COMPATIBILITY.md`.
+
+## 9. Security Checklist
 
 When changing the plugin, always verify:
 
@@ -233,7 +262,7 @@ When changing the plugin, always verify:
 - WooCommerce order lifecycle hooks
 - virtual route rendering
 
-## 9. Frontend Asset Rules
+## 10. Frontend Asset Rules
 
 Frontend asset loading is centralized in `includes/Core/Assets.php`.
 
@@ -243,7 +272,7 @@ Guidelines:
 - custom CSS from settings must be appended after base LMS styles
 - external CDN assets should be introduced carefully and documented
 
-## 10. Code Style Expectations
+## 11. Code Style Expectations
 
 When contributing:
 
@@ -254,7 +283,7 @@ When contributing:
 - keep comments short and explain intent, not obvious syntax
 - preserve the plugin naming conventions already in use
 
-## 11. Recommended Workflow For New Changes
+## 12. Recommended Workflow For New Changes
 
 1. Identify which domain owns the behavior.
 2. Check whether a helper or existing module already centralizes the rule.
@@ -263,19 +292,20 @@ When contributing:
 5. Manually test the affected route or admin flow.
 6. Update this guide or `README.md` when architecture changes.
 
-## 12. Release Checklist
+## 13. Release Checklist
 
 - activation still runs without fatal errors
 - rewrite rules and virtual routes still resolve correctly
 - course purchase still creates pending enrollments
 - paid orders still activate access
 - invalid orders still revoke access
+- common WooCommerce gateways still activate access through standard payment hooks
 - lesson progress still persists
 - student dashboard still renders every section
 - certificate generation still works for admin preview and student access
 - custom CSS editor still appends overrides without breaking default styles
 
-## 13. Known Architectural Constraints
+## 14. Known Architectural Constraints
 
 - the plugin intentionally changes some global registration settings on activation
 - WooCommerce remains the source of truth for order state, while LMS tables remain the source of truth for access state

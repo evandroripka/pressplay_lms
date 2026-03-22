@@ -1,9 +1,13 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/**
+ * WooCommerce bridge for course products, checkout flow, and payment-driven enrollment sync.
+ */
 class PRESS_LMS_Woo
 {
     private const ACCOUNT_ENDPOINT = 'area-do-aluno';
+    private const INVALIDATING_ORDER_STATUSES = ['cancelled', 'failed', 'refunded'];
 
     public static function init()
     {
@@ -15,12 +19,9 @@ class PRESS_LMS_Woo
         add_action('woocommerce_add_to_cart', [__CLASS__, 'handle_add_to_cart'], 10, 6);
         // Ensure pending enrollments also exist when the order is created at checkout.
         add_action('woocommerce_checkout_order_processed', [__CLASS__, 'handle_order_processed'], 10, 3);
-        // Activate enrollments once the order is paid or processed.
-        add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_completed'], 10, 1);
-        add_action('woocommerce_order_status_completed', [__CLASS__, 'handle_order_completed'], 10, 1);
-        add_action('woocommerce_order_status_cancelled', [__CLASS__, 'handle_order_invalidated'], 10, 2);
-        add_action('woocommerce_order_status_failed', [__CLASS__, 'handle_order_invalidated'], 10, 2);
-        add_action('woocommerce_order_status_refunded', [__CLASS__, 'handle_order_invalidated'], 10, 2);
+        // React to payment confirmation through the official WooCommerce payment lifecycle.
+        add_action('woocommerce_payment_complete', [__CLASS__, 'handle_payment_complete'], 10, 2);
+        add_action('woocommerce_order_status_changed', [__CLASS__, 'handle_order_status_changed'], 10, 4);
         add_filter('woocommerce_is_purchasable', [__CLASS__, 'filter_is_purchasable'], 10, 2);
         add_filter('woocommerce_is_sold_individually', [__CLASS__, 'filter_is_sold_individually'], 10, 2);
         add_filter('woocommerce_add_to_cart_validation', [__CLASS__, 'validate_add_to_cart'], 10, 6);
@@ -104,8 +105,10 @@ class PRESS_LMS_Woo
         }
         if (!$order) return;
 
-        $user_id = (int) $order->get_user_id();
+        $user_id = self::get_order_user_id($order);
         if ($user_id <= 0) return;
+
+        $provider = self::get_order_payment_provider($order);
 
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
@@ -118,14 +121,51 @@ class PRESS_LMS_Woo
                 if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
                     continue;
                 }
-                PRESS_LMS_Enrollments::get_or_create_pending($user_id, $course_id, 'woocommerce');
-                PRESS_LMS_Enrollments::attach_order_to_pending_enrollment($user_id, $course_id, (int) $order_id, 'woocommerce');
+                PRESS_LMS_Enrollments::get_or_create_pending($user_id, $course_id, $provider);
+                PRESS_LMS_Enrollments::attach_order_to_pending_enrollment($user_id, $course_id, (int) $order_id, $provider);
             }
         }
     }
 
     /**
-     * Activate the enrollment when payment is confirmed.
+     * Activate enrollments when WooCommerce confirms payment explicitly.
+     */
+    public static function handle_payment_complete($order_id, $transaction_id = ''): void
+    {
+        if (!class_exists('WooCommerce')) return;
+
+        $order = wc_get_order($order_id);
+        if (!$order) return;
+
+        self::activate_order_enrollments($order);
+    }
+
+    /**
+     * React to generic order status changes so gateway-specific webhooks remain compatible.
+     */
+    public static function handle_order_status_changed($order_id, $from_status, $to_status, $order = null): void
+    {
+        if (!class_exists('WooCommerce')) return;
+
+        if (!$order instanceof WC_Order) {
+            $order = wc_get_order($order_id);
+        }
+        if (!$order) return;
+
+        $to_status = self::normalize_order_status($to_status);
+
+        if (self::is_paid_order_status($to_status)) {
+            self::activate_order_enrollments($order);
+            return;
+        }
+
+        if (self::is_invalidating_order_status($to_status)) {
+            self::handle_order_invalidated($order_id, $order);
+        }
+    }
+
+    /**
+     * Preserve the legacy public method name for internal compatibility.
      */
     public static function handle_order_completed($order_id)
     {
@@ -134,8 +174,18 @@ class PRESS_LMS_Woo
         $order = wc_get_order($order_id);
         if (!$order) return;
 
-        $user_id = (int) $order->get_user_id();
+        self::activate_order_enrollments($order);
+    }
+
+    /**
+     * Activate every enrollment linked to paid course products in the order.
+     */
+    private static function activate_order_enrollments(WC_Order $order): void
+    {
+        $user_id = self::get_order_user_id($order);
         if ($user_id <= 0) return;
+
+        $provider = self::get_order_payment_provider($order);
 
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
@@ -148,7 +198,7 @@ class PRESS_LMS_Woo
                 if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
                     continue;
                 }
-                PRESS_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int)$order_id, 'woocommerce');
+                PRESS_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int) $order->get_id(), $provider);
             }
         }
     }
@@ -165,11 +215,11 @@ class PRESS_LMS_Woo
         }
         if (!$order) return;
 
-        $user_id = (int) $order->get_user_id();
+        $user_id = self::get_order_user_id($order);
         if ($user_id <= 0) return;
 
-        $status = sanitize_key((string) $order->get_status());
-        $enrollment_status = in_array($status, ['cancelled', 'failed', 'refunded'], true)
+        $status = self::normalize_order_status((string) $order->get_status());
+        $enrollment_status = self::is_invalidating_order_status($status)
             ? $status
             : 'cancelled';
 
@@ -185,6 +235,78 @@ class PRESS_LMS_Woo
 
             PRESS_LMS_Enrollments::deactivate_enrollment($user_id, $course_id, $enrollment_status, (int) $order_id);
         }
+    }
+
+    /**
+     * Resolve the gateway identifier stored on the WooCommerce order.
+     */
+    private static function get_order_payment_provider(WC_Order $order): string
+    {
+        $gateway_id = sanitize_key((string) $order->get_payment_method());
+        if ($gateway_id === '') {
+            return 'woocommerce';
+        }
+
+        return substr($gateway_id, 0, 40);
+    }
+
+    /**
+     * Prefer the linked customer account, but fall back to billing email when possible.
+     */
+    private static function get_order_user_id(WC_Order $order): int
+    {
+        $user_id = (int) $order->get_user_id();
+        if ($user_id > 0) {
+            return $user_id;
+        }
+
+        $email = sanitize_email((string) $order->get_billing_email());
+        if ($email === '') {
+            return 0;
+        }
+
+        $user = get_user_by('email', $email);
+        return $user instanceof WP_User ? (int) $user->ID : 0;
+    }
+
+    /**
+     * Normalize order statuses coming from core hooks or custom extensions.
+     */
+    private static function normalize_order_status(string $status): string
+    {
+        $status = sanitize_key($status);
+
+        if (strpos($status, 'wc-') === 0) {
+            $status = substr($status, 3);
+        }
+
+        return $status;
+    }
+
+    /**
+     * Respect WooCommerce's paid-status list so gateway plugins and custom statuses stay compatible.
+     */
+    private static function is_paid_order_status(string $status): bool
+    {
+        $status = self::normalize_order_status($status);
+        if ($status === '') {
+            return false;
+        }
+
+        if (!function_exists('wc_get_is_paid_statuses')) {
+            return in_array($status, ['processing', 'completed'], true);
+        }
+
+        $paid_statuses = array_map([__CLASS__, 'normalize_order_status'], (array) wc_get_is_paid_statuses());
+        return in_array($status, $paid_statuses, true);
+    }
+
+    /**
+     * Identify statuses that should revoke LMS access.
+     */
+    private static function is_invalidating_order_status(string $status): bool
+    {
+        return in_array(self::normalize_order_status($status), self::INVALIDATING_ORDER_STATUSES, true);
     }
 
     /**

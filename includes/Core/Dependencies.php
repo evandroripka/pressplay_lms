@@ -29,30 +29,6 @@ class PRESS_LMS_Dependencies
             ];
         }
 
-        // Mercado Pago is optional, but commonly used in this project.
-        $mp_candidates = [
-            'woocommerce-mercadopago/woocommerce-mercadopago.php',
-            'woocommerce-mercadopago/mercadopago.php',
-            'woocommerce-mercadopago/includes/mercadopago.php',
-        ];
-
-        $mp_active = false;
-        foreach ($mp_candidates as $basename) {
-            if (is_plugin_active($basename)) {
-                $mp_active = true;
-                break;
-            }
-        }
-
-        if (!$mp_active) {
-            $missing[] = [
-                'name' => 'Mercado Pago for WooCommerce',
-                'slug' => 'woocommerce-mercadopago',
-                'description' => 'Mercado Pago é recomendado como gateway de pagamento.',
-                'required' => false,
-            ];
-        }
-
         if (empty($missing)) return;
 
         // Show an error when a required dependency is missing, otherwise use a warning notice.

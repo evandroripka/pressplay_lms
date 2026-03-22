@@ -160,6 +160,21 @@ That refactor is worth doing only when ownership and file count justify the extr
 
 ---
 
+## Payment Compatibility
+
+Pressplay LMS now follows the WooCommerce payment lifecycle instead of relying on a gateway-specific integration.
+
+- activation listens to `woocommerce_payment_complete`
+- paid access also reacts to WooCommerce paid statuses through `wc_get_is_paid_statuses()`
+- access revocation reacts to invalid order states such as cancelled, failed, and refunded
+- the enrollment record stores the actual WooCommerce payment method used on the order
+
+This keeps the LMS compatible with gateways that correctly update WooCommerce orders, including common setups such as PayPal, Mercado Pago, PagBank/PagSeguro, Stripe, and other well-behaved WooCommerce payment extensions.
+
+Reference notes: [`docs/PAYMENT_COMPATIBILITY.md`](docs/PAYMENT_COMPATIBILITY.md)
+
+---
+
 ## Developer Docs
 
 - Collaboration guide: [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
