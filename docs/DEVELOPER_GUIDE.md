@@ -84,6 +84,7 @@ Core bootstrap happens in:
 - `includes/Core/Activator.php`
 - `includes/Core/Deactivator.php`
 - `includes/Core/Dependencies.php`
+- `pressplay-lms.php` also declares WooCommerce feature compatibility during `before_woocommerce_init`
 
 ## 4. Activation and Deactivation
 
@@ -164,6 +165,7 @@ Payment compatibility strategy:
 - treat `woocommerce_payment_complete` as the primary payment-confirmation event
 - respect `wc_get_is_paid_statuses()` so custom paid statuses remain compatible
 - store the real WooCommerce gateway ID on the enrollment when it is available
+- keep declared compatibility aligned with WooCommerce features that are incompatible by default, such as HPOS and product instance caching, only when the LMS truly uses WooCommerce CRUD and order APIs safely
 
 ### `Enrollments.php`
 

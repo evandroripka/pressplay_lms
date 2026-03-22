@@ -19,6 +19,14 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Declare compatibility with WooCommerce High-Performance Order Storage (HPOS).
+add_action('before_woocommerce_init', static function () {
+    if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('product_instance_caching', __FILE__, true);
+    }
+});
+
 // Define plugin-wide constants used across bootstrap, assets, and templates.
 define('PRESS_LMS_VERSION', '1.0.1');
 define('PRESS_LMS_FILE', __FILE__);
