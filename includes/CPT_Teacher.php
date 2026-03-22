@@ -1,10 +1,19 @@
 <?php
-// This post type is loaded from the main plugin bootstrap.
+
+/**
+ * Register the teacher post type used by LMS courses and lessons.
+ */
 class PRESSLMS_Teacher_CPT {
+    /**
+     * Hook the teacher post type registration into WordPress init.
+     */
     public static function init() {
         add_action('init', [__CLASS__, 'register_cpt']);
     }
 
+    /**
+     * Register the internal teacher post type.
+     */
     public static function register_cpt() {
         $labels = [
             'name' => 'Professores',

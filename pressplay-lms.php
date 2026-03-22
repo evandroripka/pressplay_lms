@@ -17,13 +17,13 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Core plugin constants.
+// Define plugin-wide constants used across bootstrap, assets, and templates.
 define('PRESS_LMS_VERSION', '1.0.0');
 define('PRESS_LMS_FILE', __FILE__);
 define('PRESS_LMS_PATH', plugin_dir_path(__FILE__));
 define('PRESS_LMS_URL', plugin_dir_url(__FILE__));
 
-// Bootstrap dependencies.
+// Load shared helpers, infrastructure, and domain modules.
 require_once PRESS_LMS_PATH . 'includes/Materials.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Dependencies.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Activator.php';
@@ -53,4 +53,5 @@ require_once PRESS_LMS_PATH . 'includes/Progress.php';
 require_once PRESS_LMS_PATH . 'includes/Certificate.php';
 require_once PRESS_LMS_PATH . 'includes/Course_Lifecycle.php';
 
+// Register lifecycle hooks and boot the plugin.
 PRESS_LMS_Plugin::register();

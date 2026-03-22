@@ -1,6 +1,9 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Route LMS requests through the plugin templates while preserving theme compatibility.
+ */
 class PRESS_LMS_Templates
 {
     public static function init()

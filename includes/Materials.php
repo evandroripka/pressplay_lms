@@ -182,7 +182,9 @@ class PRESS_LMS_Materials
         return array_values($out);
     }
 
-    // Internal helpers.
+    /**
+     * Internal normalization helpers.
+     */
 
     private static function sanitize_kind($kind)
     {

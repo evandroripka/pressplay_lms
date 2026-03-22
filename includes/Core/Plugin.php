@@ -1,6 +1,9 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Central plugin bootstrap for lifecycle hooks, shared assets, and module boot order.
+ */
 class PRESS_LMS_Plugin
 {
     public static function register(): void
@@ -16,6 +19,8 @@ class PRESS_LMS_Plugin
 
     public static function boot(): void
     {
+        // Boot infrastructure first so shared settings, routes, and dependency checks
+        // are available before domain modules attach their hooks.
         PRESSLMS_Assets::init();
         PRESS_LMS_Dependencies::init();
         PRESS_LMS_Settings::init();
@@ -34,6 +39,7 @@ class PRESS_LMS_Plugin
         PRESS_LMS_Course_Lifecycle::init();
         PRESS_LMS_Teacher_Meta::init();
 
+        // Keep optional integrations isolated so the core LMS can boot without them.
         if (class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'init')) {
             PRESS_LMS_Vimeo::init();
         }

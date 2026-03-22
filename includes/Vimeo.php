@@ -1,15 +1,23 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Vimeo integration helpers for token resolution, metadata lookups, and embeds.
+ */
 class PRESS_LMS_Vimeo
 {
     const OPT_TOKEN = 'press_lms_vimeo_token';
 
+    /**
+     * Reserved for future Vimeo-specific hooks.
+     */
     public static function init()
     {
-        // Reserved for future hooks.
     }
 
+    /**
+     * Resolve the configured Vimeo token while preserving legacy option support.
+     */
     public static function get_token()
     {
         // Read the token from the settings array first.
@@ -30,6 +38,9 @@ class PRESS_LMS_Vimeo
         return self::get_token() !== '';
     }
 
+    /**
+     * Extract the Vimeo video identifier from supported public and manager URLs.
+     */
     public static function parse_video_id($url)
     {
         $url = trim((string)$url);
@@ -54,6 +65,9 @@ class PRESS_LMS_Vimeo
         return null;
     }
 
+    /**
+     * Execute a Vimeo API request against the authenticated API base URL.
+     */
     public static function api_get($path)
     {
         $token = self::get_token();
@@ -83,6 +97,9 @@ class PRESS_LMS_Vimeo
         return $json;
     }
 
+    /**
+     * Fetch the standard Vimeo metadata payload for a single video.
+     */
     public static function get_video_data($video_id)
     {
         $video_id = (int)$video_id;
@@ -92,6 +109,9 @@ class PRESS_LMS_Vimeo
         return self::api_get('/videos/' . $video_id);
     }
 
+    /**
+     * Pick the first thumbnail that satisfies the target width, with fallback.
+     */
     public static function extract_thumbnail_url($data, int $target_width = 640): string
     {
         if (!is_array($data)) {
@@ -126,6 +146,9 @@ class PRESS_LMS_Vimeo
         return $fallback;
     }
 
+    /**
+     * Return a thumbnail URL for the requested Vimeo video.
+     */
     public static function get_video_thumbnail_url(int $video_id, int $target_width = 640): string
     {
         $data = self::get_video_data($video_id);
@@ -136,6 +159,9 @@ class PRESS_LMS_Vimeo
         return self::extract_thumbnail_url($data, $target_width);
     }
 
+    /**
+     * Render the standard Vimeo player iframe wrapper.
+     */
     public static function get_embed_html($video_id, $width = 960)
     {
         // Use the standard Vimeo player for public, unlisted, or embeddable private videos.
@@ -150,6 +176,9 @@ class PRESS_LMS_Vimeo
         </div>';
     }
 
+    /**
+     * Return the video duration in seconds from the Vimeo payload.
+     */
     public static function get_video_duration_seconds(int $video_id): int
     {
         $data = self::get_video_data($video_id);
