@@ -291,8 +291,11 @@ When contributing:
 4. Run PHP lint across the plugin.
 5. Manually test the affected route or admin flow.
 6. Update this guide or `README.md` when architecture changes.
+7. Update `docs/RELEASING.md` and `readme.txt` when the release metadata changes.
 
 ## 13. Release Checklist
+
+Release workflow notes live in `docs/RELEASING.md`.
 
 - activation still runs without fatal errors
 - rewrite rules and virtual routes still resolve correctly

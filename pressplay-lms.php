@@ -3,10 +3,12 @@
 /**
  * Plugin Name:       Pressplay LMS
  * Description:       Sell online courses with WooCommerce-powered enrollments, protected lessons, student dashboards, progress tracking, and certificates.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Requires Plugins:  woocommerce
+ * WC requires at least: 8.0
+ * WC tested up to:   10.6.1
  * Author:            Evandro Ripka
  * Author URI:        https://evandroripka.dev/
  * License:           GPL v2 or later
@@ -18,7 +20,7 @@
 if (!defined('ABSPATH')) exit;
 
 // Define plugin-wide constants used across bootstrap, assets, and templates.
-define('PRESS_LMS_VERSION', '1.0.0');
+define('PRESS_LMS_VERSION', '1.0.1');
 define('PRESS_LMS_FILE', __FILE__);
 define('PRESS_LMS_PATH', plugin_dir_path(__FILE__));
 define('PRESS_LMS_URL', plugin_dir_url(__FILE__));

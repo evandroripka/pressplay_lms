@@ -178,6 +178,8 @@ Reference notes: [`docs/PAYMENT_COMPATIBILITY.md`](docs/PAYMENT_COMPATIBILITY.md
 ## Developer Docs
 
 - Collaboration guide: [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
+- Release guide: [`docs/RELEASING.md`](docs/RELEASING.md)
+- Payment compatibility notes: [`docs/PAYMENT_COMPATIBILITY.md`](docs/PAYMENT_COMPATIBILITY.md)
 
 Use the developer guide as the baseline for:
 
