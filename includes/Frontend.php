@@ -202,10 +202,14 @@ class PRESS_LMS_Frontend
         $errors = [];
         $success = false;
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['press_register_nonce']) && wp_verify_nonce($_POST['press_register_nonce'], 'press_register')) {
-            $full_name = sanitize_text_field($_POST['full_name'] ?? '');
-            $phone     = sanitize_text_field($_POST['phone'] ?? '');
-            $email     = sanitize_email($_POST['email'] ?? '');
+        if (
+            ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' &&
+            isset($_POST['press_register_nonce']) &&
+            wp_verify_nonce((string) wp_unslash($_POST['press_register_nonce']), 'press_register')
+        ) {
+            $full_name = sanitize_text_field((string) wp_unslash($_POST['full_name'] ?? ''));
+            $phone     = sanitize_text_field((string) wp_unslash($_POST['phone'] ?? ''));
+            $email     = sanitize_email((string) wp_unslash($_POST['email'] ?? ''));
 
             if (strlen($full_name) < 5) $errors[] = 'Informe seu nome completo.';
             if (!PRESS_LMS_Helpers::is_valid_phone_br($phone)) $errors[] = 'Telefone inválido. Use DDD + número.';

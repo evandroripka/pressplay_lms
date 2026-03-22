@@ -688,7 +688,10 @@ class PRESS_LMS_Settings
 
     private static function get_css_preview_probe_url(): string
     {
-        return add_query_arg('presslms_css_preview', '1', home_url('/'));
+        return add_query_arg([
+            'presslms_css_preview' => '1',
+            '_presslms_preview_nonce' => wp_create_nonce('press_lms_css_preview'),
+        ], home_url('/'));
     }
 
     public static function maybe_render_css_preview_probe(): void
@@ -699,6 +702,11 @@ class PRESS_LMS_Settings
 
         $probe = isset($_GET['presslms_css_preview']) ? sanitize_text_field(wp_unslash($_GET['presslms_css_preview'])) : '';
         if ($probe !== '1') {
+            return;
+        }
+
+        $nonce = isset($_GET['_presslms_preview_nonce']) ? (string) wp_unslash($_GET['_presslms_preview_nonce']) : '';
+        if (!is_user_logged_in() || !current_user_can('manage_options') || !wp_verify_nonce($nonce, 'press_lms_css_preview')) {
             return;
         }
 

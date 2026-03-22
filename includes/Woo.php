@@ -61,7 +61,9 @@ class PRESS_LMS_Woo
             return;
         }
 
-        $request_path = trim((string) wp_parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
+        $request_path = class_exists('PRESS_LMS_Rewrite') && method_exists('PRESS_LMS_Rewrite', 'get_request_path')
+            ? PRESS_LMS_Rewrite::get_request_path()
+            : trim((string) wp_parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
         $endpoint_path = trim((string) wp_parse_url(trailingslashit($myaccount_url) . self::ACCOUNT_ENDPOINT . '/', PHP_URL_PATH), '/');
 
         if ($request_path !== '' && $endpoint_path !== '' && $request_path === $endpoint_path) {
@@ -222,8 +224,12 @@ class PRESS_LMS_Woo
             return '';
         }
 
-        $course_url = get_permalink($course_id);
-        return $course_url ? (string) $course_url : '';
+        $course = get_post($course_id);
+        if (!$course instanceof WP_Post || $course->post_type !== 'press_course') {
+            return '';
+        }
+
+        return home_url('/curso/' . $course->post_name . '/');
     }
 
     private static function woo_active()

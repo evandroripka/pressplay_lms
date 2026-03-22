@@ -3,10 +3,26 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Certificate
 {
+    private const ADMIN_CERTIFICATE_NONCE_ACTION = 'press_lms_admin_certificate';
+
     public static function init(): void
     {
         add_action('admin_post_press_lms_preview_certificate', [__CLASS__, 'preview_certificate']);
         add_action('admin_post_press_lms_download_certificate', [__CLASS__, 'download_certificate']);
+    }
+
+    public static function get_admin_certificate_url(string $action, int $course_id, int $user_id): string
+    {
+        $action = $action === 'download' ? 'press_lms_download_certificate' : 'press_lms_preview_certificate';
+
+        return wp_nonce_url(
+            admin_url(
+                'admin-post.php?action=' . $action .
+                '&course_id=' . (int) $course_id .
+                '&user_id=' . (int) $user_id
+            ),
+            self::ADMIN_CERTIFICATE_NONCE_ACTION . '_' . $action . '_' . (int) $course_id . '_' . (int) $user_id
+        );
     }
 
     public static function get_course_completed_at(int $user_id, int $course_id): string
@@ -536,6 +552,7 @@ class PRESS_LMS_Certificate
     {
         $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
         $user_id   = isset($_GET['user_id']) ? (int) $_GET['user_id'] : get_current_user_id();
+        self::guard_admin_certificate_request('press_lms_preview_certificate', $course_id, $user_id);
         self::render_certificate_for_user($course_id, $user_id, true);
     }
 
@@ -543,6 +560,19 @@ class PRESS_LMS_Certificate
     {
         $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
         $user_id   = isset($_GET['user_id']) ? (int) $_GET['user_id'] : get_current_user_id();
+        self::guard_admin_certificate_request('press_lms_download_certificate', $course_id, $user_id);
         self::render_certificate_for_user($course_id, $user_id, true);
+    }
+
+    private static function guard_admin_certificate_request(string $action, int $course_id, int $user_id): void
+    {
+        if (!is_user_logged_in() || !current_user_can('manage_options')) {
+            wp_die('Sem permissão para emitir este certificado.');
+        }
+
+        $nonce = isset($_GET['_wpnonce']) ? (string) wp_unslash($_GET['_wpnonce']) : '';
+        if (!wp_verify_nonce($nonce, self::ADMIN_CERTIFICATE_NONCE_ACTION . '_' . $action . '_' . $course_id . '_' . $user_id)) {
+            wp_die('Não foi possível validar a solicitação do certificado.');
+        }
     }
 }

@@ -3,6 +3,20 @@ if (!defined('ABSPATH')) exit;
 
 class PRESSLMS_Assets
 {
+  /**
+   * Resolve the active LMS frontend route once so every asset check uses the
+   * same source of truth instead of parsing REQUEST_URI in multiple places.
+   */
+  private static function get_frontend_route_type(): string
+  {
+    if (class_exists('PRESS_LMS_Frontend') && method_exists('PRESS_LMS_Frontend', 'get_current_frontend_route')) {
+      $context = PRESS_LMS_Frontend::get_current_frontend_route();
+      return sanitize_key((string) ($context['type'] ?? ''));
+    }
+
+    return '';
+  }
+
   public static function init(): void
   {
     add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue_frontend'], 20);
@@ -37,32 +51,17 @@ class PRESSLMS_Assets
 
   private static function is_student_route(): bool
   {
-    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-    $path = trim($path, '/');
-
-    if ($path === '') return false;
-
-    return (bool) preg_match('#^(meus-cursos(?:/.*)?|perfil(?:/.*)?)$#', $path);
+    return self::get_frontend_route_type() === 'student';
   }
 
   private static function is_register_route(): bool
   {
-    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-    $path = trim($path, '/');
-
-    if ($path === '') return false;
-
-    return (bool) preg_match('#^cadastro/?$#', $path);
+    return self::get_frontend_route_type() === 'register';
   }
 
   private static function is_catalog_route(): bool
   {
-    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-    $path = trim($path, '/');
-
-    if ($path === '') return false;
-
-    return (bool) preg_match('#^cursos/?$#', $path);
+    return self::get_frontend_route_type() === 'catalog';
   }
 
   /**
@@ -70,12 +69,7 @@ class PRESSLMS_Assets
    */
   private static function is_lesson_route(): bool
   {
-    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-    $path = trim($path, '/');
-
-    if ($path === '') return false;
-
-    return (bool) preg_match('#^curso/[^/]+/aula/[^/]+/?$#', $path);
+    return self::get_frontend_route_type() === 'lesson';
   }
 
   /**
@@ -83,12 +77,7 @@ class PRESSLMS_Assets
    */
   private static function is_course_route(): bool
   {
-    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-    $path = trim($path, '/');
-
-    if ($path === '') return false;
-
-    return (bool) preg_match('#^curso/[^/]+/?$#', $path);
+    return self::get_frontend_route_type() === 'course';
   }
 
   private static function enqueue_shared_styles(): void

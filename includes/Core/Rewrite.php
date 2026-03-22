@@ -10,7 +10,13 @@ class PRESS_LMS_Rewrite
         return self::SCHEMA_VERSION;
     }
 
-    private static function get_request_path(): string
+    /**
+     * Return the normalized request path relative to the WordPress home path.
+     *
+     * This keeps route detection consistent across root installs, subdirectory
+     * installs, reverse proxies, and custom domains.
+     */
+    public static function get_request_path(): string
     {
         $path = (string) wp_parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
         $home_path = (string) wp_parse_url(home_url('/'), PHP_URL_PATH);
@@ -53,7 +59,7 @@ class PRESS_LMS_Rewrite
         // Student dashboard sections with dedicated URLs.
         add_rewrite_rule(
             '^meus-cursos/certificados/?$',
-            'index.php?press_my_courses=1&press_student_area=$matches[1]',
+            'index.php?press_my_courses=1&press_student_area=certificates',
             'top'
         );
 

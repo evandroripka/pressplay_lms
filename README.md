@@ -224,6 +224,8 @@ Main modules:
 - `Actions.php`: profile, password, enrollment, and AJAX actions
 - `Settings.php`: operational admin screens
 
+Developer collaboration notes live in [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md).
+
 ---
 
 ## Dependencies

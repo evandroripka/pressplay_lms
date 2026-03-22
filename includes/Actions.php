@@ -119,9 +119,25 @@ class PRESS_LMS_Actions
         $lesson_id = isset($_POST['lesson_id']) ? (int) $_POST['lesson_id'] : 0;
         $watched_seconds = isset($_POST['watched_seconds']) ? (int) $_POST['watched_seconds'] : 0;
         $completed = !empty($_POST['completed']) ? 1 : 0;
+        $watched_seconds = max(0, $watched_seconds);
 
         if ($course_id <= 0 || $lesson_id <= 0) {
             wp_send_json_error(['message' => 'Dados inválidos.'], 400);
+        }
+
+        $lesson = get_post($lesson_id);
+        $lesson_course_id = $lesson instanceof WP_Post ? (int) $lesson->post_parent : 0;
+
+        if ($lesson_course_id <= 0) {
+            $lesson_course_id = (int) get_post_meta($lesson_id, '_press_lesson_course_id', true);
+        }
+
+        if (
+            !$lesson instanceof WP_Post ||
+            $lesson->post_type !== 'press_lesson' ||
+            $lesson_course_id !== $course_id
+        ) {
+            wp_send_json_error(['message' => 'A aula informada não pertence ao curso.'], 400);
         }
 
         if (!class_exists('PRESS_LMS_Enrollments') || !PRESS_LMS_Enrollments::can_access_course($user_id, $course_id)) {
@@ -278,7 +294,7 @@ class PRESS_LMS_Actions
 
         if (
             !isset($_POST['press_lms_account_profile_nonce']) ||
-            !wp_verify_nonce((string) $_POST['press_lms_account_profile_nonce'], 'press_lms_update_account_profile')
+            !wp_verify_nonce((string) wp_unslash($_POST['press_lms_account_profile_nonce']), 'press_lms_update_account_profile')
         ) {
             wp_safe_redirect(self::get_student_dashboard_url('profile', ['notice' => 'profile_nonce_invalid']));
             exit;
@@ -364,7 +380,7 @@ class PRESS_LMS_Actions
 
         if (
             !isset($_POST['press_lms_account_password_nonce']) ||
-            !wp_verify_nonce($_POST['press_lms_account_password_nonce'], 'press_lms_update_account_password')
+            !wp_verify_nonce((string) wp_unslash($_POST['press_lms_account_password_nonce']), 'press_lms_update_account_password')
         ) {
             wp_safe_redirect(self::get_student_dashboard_url($redirect_screen, ['notice' => 'password_nonce_invalid']));
             exit;
@@ -414,7 +430,7 @@ class PRESS_LMS_Actions
             self::redirect_to_enrollment_notice('enroll_invalid_request', 0, $fallback_url);
         }
 
-        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'press_lms_enroll_' . $course_id)) {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce((string) wp_unslash($_POST['_wpnonce']), 'press_lms_enroll_' . $course_id)) {
             self::redirect_to_enrollment_notice('enroll_invalid_request', $course_id, $fallback_url);
         }
 
@@ -460,7 +476,7 @@ class PRESS_LMS_Actions
             self::redirect_to_enrollment_notice('enroll_invalid_request');
         }
 
-        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'press_lms_enroll_continue_' . $course_id)) {
+        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce((string) wp_unslash($_GET['_wpnonce']), 'press_lms_enroll_continue_' . $course_id)) {
             self::redirect_to_enrollment_notice('enroll_invalid_request', $course_id);
         }
 

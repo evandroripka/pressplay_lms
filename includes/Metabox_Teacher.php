@@ -130,7 +130,7 @@ class PRESS_LMS_Teacher_Meta
 
     public static function save($post_id, $post)
     {
-        if (!isset($_POST['press_teacher_meta_nonce']) || !wp_verify_nonce($_POST['press_teacher_meta_nonce'], 'press_teacher_meta_save')) {
+        if (!isset($_POST['press_teacher_meta_nonce']) || !wp_verify_nonce((string) wp_unslash($_POST['press_teacher_meta_nonce']), 'press_teacher_meta_save')) {
             return;
         }
 
@@ -144,7 +144,7 @@ class PRESS_LMS_Teacher_Meta
             update_post_meta(
                 $post_id,
                 '_press_teacher_profession',
-                sanitize_text_field($_POST['press_teacher_profession'])
+                sanitize_text_field((string) wp_unslash($_POST['press_teacher_profession']))
             );
         }
 
@@ -159,7 +159,7 @@ class PRESS_LMS_Teacher_Meta
                 continue;
             }
 
-            $raw = trim((string) $_POST['press_teacher_' . $field]);
+            $raw = trim((string) wp_unslash($_POST['press_teacher_' . $field]));
 
             if ($raw === '') {
                 delete_post_meta($post_id, $meta_key);
@@ -179,7 +179,7 @@ class PRESS_LMS_Teacher_Meta
 
             wp_update_post([
                 'ID'           => $post_id,
-                'post_content' => wp_kses_post($_POST['press_teacher_biography']),
+                'post_content' => wp_kses_post((string) wp_unslash($_POST['press_teacher_biography'])),
             ]);
 
             add_action('save_post_press_teacher', [__CLASS__, 'save'], 10, 2);

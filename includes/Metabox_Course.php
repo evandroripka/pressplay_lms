@@ -778,42 +778,38 @@ class PRESS_LMS_Course_Meta
     public static function save($post_id, $post)
     {
         // Verify the metabox nonce and bail out on invalid saves.
-        if (!isset($_POST['press_course_meta_nonce']) || !wp_verify_nonce($_POST['press_course_meta_nonce'], 'press_course_meta_save')) {
+        if (!isset($_POST['press_course_meta_nonce']) || !wp_verify_nonce((string) wp_unslash($_POST['press_course_meta_nonce']), 'press_course_meta_save')) {
             return;
         }
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (wp_is_post_revision($post_id)) return;
         if (!current_user_can('edit_post', $post_id)) return;
+
         if (isset($_POST['press_course_certificate_html'])) {
             update_post_meta(
                 $post_id,
                 '_press_course_certificate_html',
-                wp_kses_post($_POST['press_course_certificate_html'])
+                wp_kses_post((string) wp_unslash($_POST['press_course_certificate_html']))
             );
         }
+
         // Persist the course price used to sync WooCommerce products.
         if (isset($_POST['press_course_price'])) {
-            $raw = str_replace(',', '.', sanitize_text_field($_POST['press_course_price']));
+            $raw = str_replace(',', '.', sanitize_text_field((string) wp_unslash($_POST['press_course_price'])));
             $raw = preg_replace('/[^0-9.]/', '', $raw);
             update_post_meta($post_id, '_press_course_price', $raw);
         }
-        if (isset($_POST['press_course_certificate_html'])) {
-            update_post_meta(
-                $post_id,
-                '_press_course_certificate_html',
-                wp_kses_post($_POST['press_course_certificate_html'])
-            );
-        }
+
         // Persist the optional course trailer URL.
         if (isset($_POST['press_course_trailer'])) {
-            update_post_meta($post_id, '_press_course_trailer', esc_url_raw($_POST['press_course_trailer']));
+            update_post_meta($post_id, '_press_course_trailer', esc_url_raw((string) wp_unslash($_POST['press_course_trailer'])));
         }
         if (isset($_POST['press_course_teacher'])) {
-            update_post_meta($post_id, '_press_course_teacher', (int) $_POST['press_course_teacher']);
+            update_post_meta($post_id, '_press_course_teacher', (int) wp_unslash($_POST['press_course_teacher']));
         }
         if (isset($_POST['press_course_access_type'])) {
             $access_type = sanitize_key((string) wp_unslash($_POST['press_course_access_type']));
-            $access_value = isset($_POST['press_course_access_value']) ? (int) $_POST['press_course_access_value'] : 1;
+            $access_value = isset($_POST['press_course_access_value']) ? (int) wp_unslash($_POST['press_course_access_value']) : 1;
 
             if (class_exists('PRESS_LMS_Enrollments') && method_exists('PRESS_LMS_Enrollments', 'normalize_access_settings')) {
                 $settings = PRESS_LMS_Enrollments::normalize_access_settings($access_type, $access_value);
@@ -834,7 +830,7 @@ class PRESS_LMS_Course_Meta
             update_post_meta(
                 $post_id,
                 '_press_course_paused',
-                $_POST['press_course_paused'] === 'yes' ? 'yes' : 'no'
+                (string) wp_unslash($_POST['press_course_paused']) === 'yes' ? 'yes' : 'no'
             );
 
             if (class_exists('PRESS_LMS_Woo') && method_exists('PRESS_LMS_Woo', 'sync_course_product_state')) {
@@ -846,7 +842,7 @@ class PRESS_LMS_Course_Meta
             update_post_meta(
                 $post_id,
                 '_press_course_certificate_description',
-                wp_kses_post($_POST['press_course_certificate_description'])
+                wp_kses_post((string) wp_unslash($_POST['press_course_certificate_description']))
             );
         }
 
@@ -854,7 +850,7 @@ class PRESS_LMS_Course_Meta
             update_post_meta(
                 $post_id,
                 '_press_course_certificate_logo_id',
-                (int) $_POST['press_course_certificate_logo_id']
+                (int) wp_unslash($_POST['press_course_certificate_logo_id'])
             );
         }
 
@@ -862,7 +858,7 @@ class PRESS_LMS_Course_Meta
             update_post_meta(
                 $post_id,
                 '_press_course_certificate_signature_id',
-                (int) $_POST['press_course_certificate_signature_id']
+                (int) wp_unslash($_POST['press_course_certificate_signature_id'])
             );
         }
     }

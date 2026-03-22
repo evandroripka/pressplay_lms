@@ -540,14 +540,14 @@ class PRESS_LMS_Lesson_Meta
 
     public static function save($post_id, $post)
     {
-        if (!isset($_POST['press_lesson_meta_nonce']) || !wp_verify_nonce($_POST['press_lesson_meta_nonce'], 'press_lesson_meta_save')) {
+        if (!isset($_POST['press_lesson_meta_nonce']) || !wp_verify_nonce((string) wp_unslash($_POST['press_lesson_meta_nonce']), 'press_lesson_meta_save')) {
             return;
         }
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
 
-        $course_id = intval($_POST['press_lesson_course_id'] ?? 0);
-        $video_url = esc_url_raw($_POST['press_lesson_video_url'] ?? '');
+        $course_id = intval(wp_unslash($_POST['press_lesson_course_id'] ?? 0));
+        $video_url = esc_url_raw((string) wp_unslash($_POST['press_lesson_video_url'] ?? ''));
 
         update_post_meta($post_id, self::META_COURSE_ID, $course_id);
         global $wpdb;
@@ -564,12 +564,12 @@ class PRESS_LMS_Lesson_Meta
         // Rebuild the structured v2 materials array from the submitted fields.
         $items = [];
 
-        $ids       = $_POST['press_material_id'] ?? [];
-        $types     = $_POST['press_material_type'] ?? [];
-        $names     = $_POST['press_material_name'] ?? [];
-        $urls_file = $_POST['press_material_url_file'] ?? [];
-        $urls_link = $_POST['press_material_url_link'] ?? [];
-        $atts      = $_POST['press_material_attachment_id'] ?? [];
+        $ids       = isset($_POST['press_material_id']) ? wp_unslash($_POST['press_material_id']) : [];
+        $types     = isset($_POST['press_material_type']) ? wp_unslash($_POST['press_material_type']) : [];
+        $names     = isset($_POST['press_material_name']) ? wp_unslash($_POST['press_material_name']) : [];
+        $urls_file = isset($_POST['press_material_url_file']) ? wp_unslash($_POST['press_material_url_file']) : [];
+        $urls_link = isset($_POST['press_material_url_link']) ? wp_unslash($_POST['press_material_url_link']) : [];
+        $atts      = isset($_POST['press_material_attachment_id']) ? wp_unslash($_POST['press_material_attachment_id']) : [];
 
         if (is_array($types)) {
             foreach ($types as $k => $t) {
@@ -644,7 +644,7 @@ class PRESS_LMS_Lesson_Meta
             if (is_array($items)) $items = array_values($items);
         }
         if (isset($_POST['press_lesson_teacher'])) {
-            update_post_meta($post_id, '_press_lesson_teacher', (int) $_POST['press_lesson_teacher']);
+            update_post_meta($post_id, '_press_lesson_teacher', (int) wp_unslash($_POST['press_lesson_teacher']));
         }
         update_post_meta($post_id, self::META_MATERIALS, $items);
 

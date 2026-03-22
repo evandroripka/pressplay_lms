@@ -3,6 +3,15 @@ if (!defined('ABSPATH')) exit;
 
 class PRESS_LMS_Activator
 {
+    private static function backup_option_once(string $backup_option, string $target_option): void
+    {
+        if (get_option($backup_option, null) !== null) {
+            return;
+        }
+
+        add_option($backup_option, get_option($target_option), '', false);
+    }
+
     public static function activate()
     {
         // Create or update custom database tables.
@@ -26,8 +35,8 @@ class PRESS_LMS_Activator
             PRESS_LMS_Woo::register_account_endpoint();
         }
 
-        update_option('press_lms_backup_users_can_register', get_option('users_can_register'));
-        update_option('press_lms_backup_default_role', get_option('default_role'));
+        self::backup_option_once('press_lms_backup_users_can_register', 'users_can_register');
+        self::backup_option_once('press_lms_backup_default_role', 'default_role');
 
         // Enable public registration for the student flow.
         update_option('users_can_register', 1);
@@ -39,11 +48,11 @@ class PRESS_LMS_Activator
         // Align WooCommerce account settings with the LMS enrollment flow.
         if (class_exists('WooCommerce')) {
             // Preserve the current WooCommerce settings so they can be restored later.
-            update_option('press_lms_backup_guest_checkout', get_option('woocommerce_enable_guest_checkout'));
-            update_option('press_lms_backup_myaccount_registration', get_option('woocommerce_enable_myaccount_registration'));
-            update_option('press_lms_backup_generate_password', get_option('woocommerce_registration_generate_password'));
-            update_option('press_lms_backup_signup_and_login_from_checkout', get_option('woocommerce_enable_signup_and_login_from_checkout'));
-            update_option('press_lms_backup_checkout_registration', get_option('woocommerce_enable_checkout_registration'));
+            self::backup_option_once('press_lms_backup_guest_checkout', 'woocommerce_enable_guest_checkout');
+            self::backup_option_once('press_lms_backup_myaccount_registration', 'woocommerce_enable_myaccount_registration');
+            self::backup_option_once('press_lms_backup_generate_password', 'woocommerce_registration_generate_password');
+            self::backup_option_once('press_lms_backup_signup_and_login_from_checkout', 'woocommerce_enable_signup_and_login_from_checkout');
+            self::backup_option_once('press_lms_backup_checkout_registration', 'woocommerce_enable_checkout_registration');
 
             // Force account creation to keep enrollments linked to a user account.
             update_option('woocommerce_enable_guest_checkout', 'no');

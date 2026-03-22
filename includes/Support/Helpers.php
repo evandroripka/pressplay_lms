@@ -103,16 +103,24 @@ class PRESS_LMS_Helpers {
         return self::$lesson_thumbnail_cache[$cache_key];
     }
 
-    public static function username_from_email($email) {
-        $base = sanitize_user(current(explode('@', $email)), true);
-        if (!$base) $base = 'aluno';
-        $u = $base;
-        $i = 1;
-        while (username_exists($u)) {
-            $u = $base . $i;
-            $i++;
+    public static function username_from_email($email): string {
+        $email = sanitize_email((string) $email);
+        $email_parts = explode('@', $email);
+        $base = sanitize_user((string) ($email_parts[0] ?? ''), true);
+
+        if ($base === '') {
+            $base = 'aluno';
         }
-        return $u;
+
+        $username = $base;
+        $suffix = 1;
+
+        while (username_exists($username)) {
+            $username = $base . $suffix;
+            $suffix++;
+        }
+
+        return $username;
     }
 
     public static function is_valid_phone_br($phone) {
@@ -187,10 +195,21 @@ class PRESS_LMS_Helpers {
         delete_user_meta($user_id, self::STUDENT_AVATAR_META_KEY);
     }
 
+    /**
+     * Persist the normalized student profile that powers the LMS account area.
+     */
     public static function upsert_student_profile($user_id, $full_name, $phone) {
         global $wpdb;
+
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return;
+        }
+
         $table = PRESS_LMS_Database::table('students');
         $now = current_time('mysql');
+        $full_name = sanitize_text_field((string) $full_name);
+        $phone = sanitize_text_field((string) $phone);
 
         $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE user_id = %d", $user_id));
         $data = [

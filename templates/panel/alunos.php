@@ -282,11 +282,7 @@ if (!function_exists('presslms_admin_student_initials')) {
                                             <a
                                                 class="button presslms-button presslms-button--success presslms-btn-action"
                                                 target="_blank"
-                                                href="<?php echo esc_url(
-                                                    admin_url(
-                                                        'admin-post.php?action=press_lms_preview_certificate&course_id=' . (int) $student->course_id . '&user_id=' . (int) $student->user_id
-                                                    )
-                                                ); ?>"
+                                                href="<?php echo esc_url(PRESS_LMS_Certificate::get_admin_certificate_url('preview', (int) $student->course_id, (int) $student->user_id)); ?>"
                                             >
                                                 Emitir Certificado
                                             </a>
