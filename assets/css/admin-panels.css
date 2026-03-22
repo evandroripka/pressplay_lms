@@ -258,6 +258,345 @@ select.presslms-field__control {
   margin-top: 4px;
 }
 
+.presslms-css-field {
+  display: grid;
+  gap: 18px;
+}
+
+.presslms-css-suggestions {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #d0d5dd;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+}
+
+.presslms-css-suggestions__header {
+  display: grid;
+  gap: 6px;
+}
+
+.presslms-css-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.presslms-css-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #344054;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.presslms-css-tab:hover,
+.presslms-css-tab:focus {
+  border-color: #98a2b3;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.presslms-css-tab.is-active {
+  border-color: #0f172a;
+  background: linear-gradient(135deg, #111827, #1f2937);
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
+}
+
+.presslms-css-tab__label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.presslms-css-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.presslms-css-tab.is-active .presslms-css-tab__count {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.presslms-css-tab-panels {
+  display: grid;
+}
+
+.presslms-css-pane {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #e4e7ec;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.presslms-css-pane[hidden],
+.presslms-css-pane:not(.is-active) {
+  display: none !important;
+}
+
+.presslms-css-pane__description {
+  margin: 0;
+}
+
+.presslms-css-suggestion-group {
+  display: grid;
+  gap: 10px;
+}
+
+.presslms-css-suggestion-group__title,
+.presslms-css-selectors__title {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.presslms-css-suggestion-list,
+.presslms-css-selector-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.presslms-css-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  padding: 12px 14px;
+  margin: 0;
+  border: 1px solid #d8dee8;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  color: #101828;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.presslms-css-suggestion:hover,
+.presslms-css-suggestion:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+}
+
+.presslms-css-suggestion.is-copied {
+  border-color: #16a34a;
+  background: linear-gradient(180deg, #f0fdf4, #dcfce7);
+  box-shadow: 0 18px 30px rgba(22, 163, 74, 0.14);
+}
+
+.presslms-css-suggestion__swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(16, 24, 40, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  flex: 0 0 18px;
+}
+
+.presslms-css-suggestion__swatch--empty {
+  background:
+    linear-gradient(135deg, #f2f4f7 25%, transparent 25%) -4px 0/8px 8px,
+    linear-gradient(225deg, #f2f4f7 25%, transparent 25%) -4px 0/8px 8px,
+    linear-gradient(315deg, #f2f4f7 25%, transparent 25%) 0 0/8px 8px,
+    linear-gradient(45deg, #f2f4f7 25%, transparent 25%) 0 0/8px 8px,
+    #ffffff;
+}
+
+.presslms-css-suggestion__content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.presslms-css-suggestion__content strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.presslms-css-suggestion__content code {
+  font-size: 12px;
+  color: #475467;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.presslms-css-suggestion__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.presslms-css-suggestion.is-copied .presslms-css-suggestion__action {
+  background: linear-gradient(135deg, #15803d, #16a34a);
+}
+
+.presslms-css-empty-state {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  background: #f8fafc;
+  color: #475467;
+}
+
+.presslms-css-preview-frame {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  inset: auto auto 0 0;
+}
+
+.presslms-css-editor {
+  min-height: 360px;
+  padding: 16px;
+  border: 1px solid #111827;
+  border-radius: 18px;
+  background: #030712;
+  color: #e5edf7;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  line-height: 1.6;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.18);
+}
+
+.presslms-css-editor::placeholder {
+  color: #7c89a0;
+}
+
+.presslms-css-field .CodeMirror {
+  height: auto;
+  min-height: 360px;
+  border: 1px solid #111827;
+  border-radius: 18px;
+  background: #030712;
+  color: #e5edf7;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.24);
+}
+
+.presslms-css-field .CodeMirror-gutters {
+  background: #020617;
+  border-right: 1px solid #111827;
+}
+
+.presslms-css-field .CodeMirror-linenumber {
+  color: #61708a;
+}
+
+.presslms-css-field .CodeMirror-cursor {
+  border-left: 1px solid #f8fafc;
+}
+
+.presslms-css-field .CodeMirror-activeline-background,
+.presslms-css-field .CodeMirror-activeline .CodeMirror-linebackground,
+.presslms-css-field .CodeMirror-activeline-gutter {
+  background: transparent !important;
+}
+
+.presslms-css-field .CodeMirror-lines {
+  padding: 16px 0;
+}
+
+.presslms-css-field .CodeMirror pre.CodeMirror-line,
+.presslms-css-field .CodeMirror pre.CodeMirror-line-like {
+  padding: 0 16px;
+}
+
+.presslms-css-field .cm-s-default .cm-comment {
+  color: #64748b;
+}
+
+.presslms-css-field .cm-s-default .cm-atom,
+.presslms-css-field .cm-s-default .cm-number {
+  color: #f9a8d4;
+}
+
+.presslms-css-field .cm-s-default .cm-def,
+.presslms-css-field .cm-s-default .cm-variable-2,
+.presslms-css-field .cm-s-default .cm-variable-3 {
+  color: #c4b5fd;
+}
+
+.presslms-css-field .cm-s-default .cm-property,
+.presslms-css-field .cm-s-default .cm-attribute,
+.presslms-css-field .cm-s-default .cm-tag {
+  color: #7dd3fc;
+}
+
+.presslms-css-field .cm-s-default .cm-string,
+.presslms-css-field .cm-s-default .cm-string-2 {
+  color: #86efac;
+}
+
+.presslms-css-field .cm-s-default .cm-keyword,
+.presslms-css-field .cm-s-default .cm-qualifier {
+  color: #fbbf24;
+}
+
+.presslms-css-field .cm-s-default .cm-operator,
+.presslms-css-field .cm-s-default .cm-bracket {
+  color: #e2e8f0;
+}
+
+.presslms-css-selectors {
+  display: grid;
+  gap: 10px;
+}
+
+.presslms-css-selector {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #344054;
+  font-size: 12px;
+  border: 1px solid #e4e7ec;
+}
+
 .presslms-progress-meta {
   margin-bottom: 6px;
   color: #667085;

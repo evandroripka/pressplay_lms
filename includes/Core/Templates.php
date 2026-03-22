@@ -5,7 +5,8 @@ class PRESS_LMS_Templates
 {
     public static function init()
     {
-        add_filter('template_include', [__CLASS__, 'template_include']);
+        // Run late so page-builder template loaders do not override LMS virtual routes.
+        add_filter('template_include', [__CLASS__, 'template_include'], 9999);
         add_filter('pre_get_document_title', [__CLASS__, 'filter_document_title'], 20);
         add_filter('body_class', [__CLASS__, 'filter_body_class']);
     }

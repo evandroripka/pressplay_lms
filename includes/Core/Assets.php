@@ -10,6 +10,11 @@ class PRESSLMS_Assets
 
   public static function enqueue_frontend(): void
   {
+    if (self::is_register_route()) {
+      self::enqueue_register_assets();
+      return;
+    }
+
     if (self::is_student_route()) {
       self::enqueue_student_assets();
       return;
@@ -38,6 +43,16 @@ class PRESSLMS_Assets
     if ($path === '') return false;
 
     return (bool) preg_match('#^(meus-cursos(?:/.*)?|perfil(?:/.*)?)$#', $path);
+  }
+
+  private static function is_register_route(): bool
+  {
+    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    $path = trim($path, '/');
+
+    if ($path === '') return false;
+
+    return (bool) preg_match('#^cadastro/?$#', $path);
   }
 
   private static function is_catalog_route(): bool
@@ -99,6 +114,27 @@ class PRESSLMS_Assets
     }
   }
 
+  private static function append_custom_css(string $handle): void
+  {
+    if (!class_exists('PRESS_LMS_Settings') || !method_exists('PRESS_LMS_Settings', 'get_frontend_custom_css')) {
+      return;
+    }
+
+    $css = PRESS_LMS_Settings::get_frontend_custom_css();
+    if (!is_string($css) || trim($css) === '') {
+      return;
+    }
+
+    wp_add_inline_style($handle, $css);
+  }
+
+  private static function enqueue_register_assets(): void
+  {
+    if (wp_style_is('press-lms-app', 'enqueued')) {
+      self::append_custom_css('press-lms-app');
+    }
+  }
+
   private static function enqueue_course_assets(): void
   {
     self::enqueue_shared_styles();
@@ -127,6 +163,8 @@ class PRESSLMS_Assets
         PRESS_LMS_VERSION
       );
     }
+
+    self::append_custom_css('presslms-course');
 
     wp_localize_script('presslms-course-access-guard', 'pressLmsCourseAccessGuard', [
       'messages' => [
@@ -168,6 +206,8 @@ class PRESSLMS_Assets
         PRESS_LMS_VERSION
       );
     }
+
+    self::append_custom_css('presslms-lesson');
   }
 
   private static function enqueue_student_assets(): void
@@ -182,6 +222,8 @@ class PRESSLMS_Assets
         PRESS_LMS_VERSION
       );
     }
+
+    self::append_custom_css('presslms-student');
   }
 
   private static function enqueue_catalog_assets(): void
@@ -196,5 +238,7 @@ class PRESSLMS_Assets
         PRESS_LMS_VERSION
       );
     }
+
+    self::append_custom_css('presslms-catalog');
   }
 }
