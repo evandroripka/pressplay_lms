@@ -35,6 +35,38 @@ class PRESS_LMS_Frontend
         echo '</body></html>';
     }
 
+    private static function get_public_brand_name(): string
+    {
+        $brand_name = class_exists('PRESS_LMS_Settings')
+            ? trim((string) PRESS_LMS_Settings::get('brand_name', ''))
+            : '';
+
+        if ($brand_name === '' || strtolower($brand_name) === 'pressplay') {
+            $brand_name = trim((string) get_bloginfo('name'));
+        }
+
+        return $brand_name !== '' ? $brand_name : 'Cursos';
+    }
+
+    private static function get_public_page_title(string $label = ''): string
+    {
+        $label = trim($label);
+        $brand_name = self::get_public_brand_name();
+
+        return $label !== '' ? $label . ' - ' . $brand_name : $brand_name;
+    }
+
+    private static function get_catalog_page_heading(): string
+    {
+        $brand_name = self::get_public_brand_name();
+
+        if (preg_match('/\bcursos\b/i', $brand_name)) {
+            return $brand_name;
+        }
+
+        return $brand_name . ' Cursos';
+    }
+
     public static function is_theme_compat_request(): bool
     {
         $context = self::get_current_frontend_route();
@@ -102,19 +134,19 @@ class PRESS_LMS_Frontend
         }
 
         if ($route_type === 'catalog') {
-            return 'Cursos - Pressplay';
+            return self::get_catalog_page_heading();
         }
 
         if ($route_type === 'register') {
-            return 'Cadastro - Pressplay';
+            return self::get_public_page_title('Cadastro');
         }
 
         if ($route_type === 'course') {
             $course = get_page_by_path((string) ($context['course_slug'] ?? ''), OBJECT, 'press_course');
 
             return $course instanceof WP_Post
-                ? sprintf('%s - Pressplay', (string) $course->post_title)
-                : 'Curso - Pressplay';
+                ? self::get_public_page_title((string) $course->post_title)
+                : self::get_public_page_title('Curso');
         }
 
         if ($route_type === 'lesson') {
@@ -127,10 +159,10 @@ class PRESS_LMS_Frontend
                 return sprintf('%s - %s', (string) $lesson->post_title, (string) $course->post_title);
             }
 
-            return 'Aula - Pressplay';
+            return self::get_public_page_title('Aula');
         }
 
-        return 'Pressplay';
+        return self::get_public_brand_name();
     }
 
     public static function render_theme_compat_content(): void
@@ -184,7 +216,7 @@ class PRESS_LMS_Frontend
 
     public static function render_register()
     {
-        self::header('Cadastro - Pressplay');
+        self::header(self::get_public_page_title('Cadastro'));
         echo '<div class="press-container">';
         echo '<div class="press-card">';
         echo '<h1 class="press-title">Criar conta</h1>';
@@ -281,35 +313,35 @@ class PRESS_LMS_Frontend
             'catalog' => [
                 'label' => 'Cursos',
                 'path' => '/cursos/',
-                'page_title' => 'Cursos - Pressplay',
+                'page_title' => self::get_catalog_page_heading(),
                 'menu' => true,
                 'student_nav' => true,
             ],
             'courses' => [
                 'label' => 'Meus cursos',
                 'path' => '/meus-cursos/',
-                'page_title' => 'Meus cursos - Pressplay',
+                'page_title' => self::get_public_page_title('Meus cursos'),
                 'menu' => true,
                 'student_nav' => true,
             ],
             'certificates' => [
                 'label' => 'Certificados',
                 'path' => '/meus-cursos/certificados/',
-                'page_title' => 'Certificados - Pressplay',
+                'page_title' => self::get_public_page_title('Certificados'),
                 'menu' => true,
                 'student_nav' => true,
             ],
             'profile' => [
                 'label' => 'Meu perfil',
                 'path' => '/perfil/',
-                'page_title' => 'Meu perfil - Pressplay',
+                'page_title' => self::get_public_page_title('Meu perfil'),
                 'menu' => true,
                 'student_nav' => true,
             ],
             'password' => [
                 'label' => 'Trocar senha',
                 'path' => '/perfil/trocar-senha/',
-                'page_title' => 'Trocar senha - Pressplay',
+                'page_title' => self::get_public_page_title('Trocar senha'),
                 'menu' => true,
                 'student_nav' => true,
             ],
@@ -418,7 +450,7 @@ class PRESS_LMS_Frontend
     {
         $areas = self::get_student_area_definitions();
 
-        return (string) ($areas[$area]['page_title'] ?? 'Área do Aluno - Pressplay');
+        return (string) ($areas[$area]['page_title'] ?? self::get_public_page_title('Área do aluno'));
     }
 
     private static function get_student_login_url(string $redirect_to = ''): string
@@ -926,7 +958,7 @@ class PRESS_LMS_Frontend
 
     public static function render_course_archive()
     {
-        self::header('Cursos - Pressplay');
+        self::header(self::get_catalog_page_heading());
 
         $user_id = get_current_user_id();
         $course_posts = get_posts([
@@ -961,7 +993,7 @@ class PRESS_LMS_Frontend
                 : '',
         ];
         $catalog_courses_var = $courses;
-        $catalog_page_title_var = 'Cursos Pressplay LMS';
+        $catalog_page_title_var = self::get_catalog_page_heading();
 
         $template = trailingslashit(PRESS_LMS_PATH) . 'templates/frontend/course-archive.php';
 
@@ -1112,7 +1144,9 @@ class PRESS_LMS_Frontend
     {
         $course = get_page_by_path($slug, OBJECT, 'press_course');
 
-        self::header('Curso - Pressplay');
+        self::header($course instanceof WP_Post
+            ? self::get_public_page_title((string) $course->post_title)
+            : self::get_public_page_title('Curso'));
 
         if (!$course) {
             echo '<div class="press-container"><div class="press-card">';
@@ -1164,7 +1198,7 @@ class PRESS_LMS_Frontend
 
         // Stop early when either the course or the lesson cannot be resolved.
         if (!$course || !$lesson) {
-            self::header('Aula - Pressplay');
+            self::header(self::get_public_page_title('Aula'));
             echo '<div class="press-container"><div class="press-card">';
             echo '<h1 class="press-title">Aula não encontrada</h1>';
             echo '</div></div>';
@@ -1179,7 +1213,7 @@ class PRESS_LMS_Frontend
         }
 
         if ($lesson_course_id !== (int) $course->ID) {
-            self::header('Aula - Pressplay');
+            self::header(self::get_public_page_title('Aula'));
             echo '<div class="press-container"><div class="press-card">';
             echo '<h1 class="press-title">Aula não pertence a este curso</h1>';
             echo '<p><a class="press-link" href="' . esc_url(home_url('/curso/' . $course_slug)) . '">← Voltar para o curso</a></p>';
@@ -1193,7 +1227,7 @@ class PRESS_LMS_Frontend
         $can_access = PRESS_LMS_Enrollments::can_access_course($user_id, (int)$course->ID);
 
         if (!$can_access) {
-            self::header('Aula - Restrita');
+            self::header(self::get_public_page_title('Aula restrita'));
             echo '<div class="press-container"><div class="press-card">';
             echo '<h1 class="press-title">Conteúdo restrito</h1>';
             echo '<p>Você precisa estar matriculado para acessar esta aula.</p>';
@@ -1204,7 +1238,7 @@ class PRESS_LMS_Frontend
         }
 
         // Render the lesson page for enrolled users and administrators.
-        self::header('Aula - Pressplay');
+        self::header(self::get_public_page_title((string) $lesson->post_title));
 
         $video_url = get_post_meta($lesson->ID, '_press_lesson_video_url', true);
         $vimeo_id  = (int) get_post_meta($lesson->ID, '_press_lesson_vimeo_id', true);

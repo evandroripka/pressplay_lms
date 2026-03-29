@@ -29,11 +29,10 @@ $product_id = class_exists('PRESS_LMS_Enrollments')
 $can_access_course = class_exists('PRESS_LMS_Enrollments')
   ? PRESS_LMS_Enrollments::can_access_course(get_current_user_id(), (int) $course->ID)
   : false;
-
-$buy_url = '#';
-if (function_exists('wc_get_cart_url') && $product_id > 0) {
-  $buy_url = add_query_arg('add-to-cart', $product_id, wc_get_cart_url());
-}
+$is_paused = class_exists('PRESS_LMS_Enrollments')
+  ? PRESS_LMS_Enrollments::is_course_paused((int) $course->ID)
+  : false;
+$can_start_enrollment = !$can_access_course && !$is_paused && $product_id > 0;
 
 $lessons_list = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 $current_lesson_number = 0;
@@ -133,11 +132,21 @@ if (!function_exists('presslms_format_seconds')) {
             <i class="fa-light fa-arrow-left-long"></i>
             Voltar ao Curso
           </a>
+        <?php elseif ($is_paused): ?>
+          <button class="presslms-btn presslms-btn--primary" type="button" disabled>
+            <i class="fa-light fa-pause"></i>
+            Curso Pausado
+          </button>
         <?php else: ?>
-          <a class="presslms-btn presslms-btn--primary" href="<?php echo esc_url($buy_url); ?>">
+          <button
+            class="presslms-btn presslms-btn--primary"
+            type="submit"
+            form="presslms-lesson-enroll-form"
+            <?php echo $can_start_enrollment ? '' : 'disabled'; ?>
+          >
             <i class="fa-light fa-bag-shopping"></i>
             Comprar Curso
-          </a>
+          </button>
         <?php endif; ?>
       </div>
     </header>
@@ -376,6 +385,18 @@ if (!function_exists('presslms_format_seconds')) {
     </div>
   </div>
 </div>
+<?php if ($can_start_enrollment): ?>
+  <form
+    id="presslms-lesson-enroll-form"
+    method="post"
+    action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+    style="display:none;"
+  >
+    <input type="hidden" name="action" value="press_lms_enroll">
+    <input type="hidden" name="course_id" value="<?php echo esc_attr((string) $course->ID); ?>">
+    <?php echo wp_nonce_field('press_lms_enroll_' . $course->ID, '_wpnonce', true, false); ?>
+  </form>
+<?php endif; ?>
 <script>
 window.presslmsLessonData = {
   ajaxUrl: "<?php echo esc_js(admin_url('admin-ajax.php')); ?>",

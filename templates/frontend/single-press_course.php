@@ -23,11 +23,6 @@ $is_paused        = class_exists('PRESS_LMS_Enrollments')
   : false;
 $can_start_enrollment = !$can_access && !$is_paused && $product_id > 0;
 
-$buy_url = '#';
-if (function_exists('wc_get_cart_url') && $product_id > 0) {
-  $buy_url = add_query_arg('add-to-cart', $product_id, wc_get_cart_url());
-}
-
 if (!function_exists('presslms_course_format_seconds')) {
   function presslms_course_format_seconds($seconds): string
   {
@@ -184,10 +179,15 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
               </button>
               <p class="presslms-muted" style="margin:10px 0 0;">Novas matrículas estão temporariamente indisponíveis.</p>
             <?php else: ?>
-              <a class="presslms-btn presslms-btn--primary presslms-course-side__btn" href="<?php echo esc_url($buy_url); ?>">
+              <button
+                class="presslms-btn presslms-btn--primary presslms-course-side__btn"
+                type="submit"
+                form="presslms-course-enroll-form"
+                <?php echo $can_start_enrollment ? '' : 'disabled'; ?>
+              >
                 <i class="fa-light fa-bag-shopping"></i>
                 Comprar Curso
-              </a>
+              </button>
               <?php if ($product_id <= 0): ?>
                 <p class="presslms-muted" style="margin:10px 0 0;">Produto do WooCommerce ainda não gerado.</p>
               <?php endif; ?>
