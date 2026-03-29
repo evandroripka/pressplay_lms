@@ -5,93 +5,127 @@
 <h1 align="center">Pressplay LMS</h1>
 
 <p align="center">
-  A commerce-ready LMS plugin for WordPress that connects catalog, checkout, protected lessons, student operations, progress tracking, and certificates in one product flow.
+  <strong>A branded learning-commerce platform built as a WordPress plugin.</strong>
+  <br>
+  Pressplay LMS transforms WordPress + WooCommerce into a complete online-course operation with custom routes, protected lessons, student dashboards, progress tracking, certificates, payment-aware enrollments, and operational admin tooling.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/WordPress-Plugin-21759B?style=for-the-badge&logo=wordpress&logoColor=white" alt="WordPress Plugin">
-  <img src="https://img.shields.io/badge/WooCommerce-Integrated-96588A?style=for-the-badge&logo=woocommerce&logoColor=white" alt="WooCommerce Integrated">
+  <img src="https://img.shields.io/badge/WordPress-6.0%2B-21759B?style=for-the-badge&logo=wordpress&logoColor=white" alt="WordPress 6.0+">
+  <img src="https://img.shields.io/badge/WooCommerce-10.x-96588A?style=for-the-badge&logo=woocommerce&logoColor=white" alt="WooCommerce 10.x">
   <img src="https://img.shields.io/badge/PHP-8.0%2B-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.0+">
-  <img src="https://img.shields.io/badge/Vimeo-Ready-1AB7EA?style=for-the-badge&logo=vimeo&logoColor=white" alt="Vimeo Ready">
-  <img src="https://img.shields.io/badge/Theme-Compatible-Header%20%26%20Footer-0F172A?style=for-the-badge" alt="Theme Compatible">
+  <img src="https://img.shields.io/badge/Vimeo-Integrated-1AB7EA?style=for-the-badge&logo=vimeo&logoColor=white" alt="Vimeo Integrated">
+  <img src="https://img.shields.io/badge/HPOS-Compatible-111827?style=for-the-badge" alt="HPOS Compatible">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Sell-Courses-0F766E?style=flat-square" alt="Sell Courses">
-  <img src="https://img.shields.io/badge/Protect-Lessons-1D4ED8?style=flat-square" alt="Protect Lessons">
-  <img src="https://img.shields.io/badge/Track-Progress-9333EA?style=flat-square" alt="Track Progress">
-  <img src="https://img.shields.io/badge/Issue-Certificates-B45309?style=flat-square" alt="Issue Certificates">
-  <img src="https://img.shields.io/badge/Manage-Enrollments-111827?style=flat-square" alt="Manage Enrollments">
+  <img src="https://img.shields.io/badge/Branded-Student%20Experience-0F766E?style=flat-square" alt="Branded Student Experience">
+  <img src="https://img.shields.io/badge/Gateway-Agnostic%20Payments-1D4ED8?style=flat-square" alt="Gateway Agnostic Payments">
+  <img src="https://img.shields.io/badge/Custom-CSS%20System-B45309?style=flat-square" alt="Custom CSS System">
+  <img src="https://img.shields.io/badge/Certificates-Ready-7C3AED?style=flat-square" alt="Certificates Ready">
+  <img src="https://img.shields.io/badge/Operations-Ready-111827?style=flat-square" alt="Operations Ready">
 </p>
 
 ---
 
-## Quick View
+## Recruiter Snapshot
 
-| Area | Summary |
+| What this project is | What it proves |
 | --- | --- |
-| Product goal | Turn WordPress + WooCommerce into a complete online-course business flow |
-| Best fit | Teams that want a branded student experience instead of relying on `wp-admin` |
-| Main outcomes | Catalog, sales page, protected lessons, student library, certificates, enrollment operations |
-| Engineering focus | WordPress architecture, WooCommerce lifecycle hooks, custom routes, access control, theme compatibility |
+| A full LMS product plugin, not just a theme customization | Product thinking, plugin architecture, and real-world business flow design |
+| Deep WooCommerce integration | Checkout, cart, payment lifecycle, enrollment activation, and access revocation |
+| A custom branded student experience | Frontend routing, theme compatibility, UX ownership, and WordPress rendering control |
+| An operational platform, not only course pages | Support-minded engineering with enrollment management, extensions, reactivation, and certificates |
+
+> Pressplay LMS was built to make WordPress feel like a real education product, not a stack of disconnected plugins.
 
 ---
 
-## Why It Exists
+## Why This Project Stands Out
 
-Most LMS setups inside WordPress feel fragmented:
-
-- checkout lives in one plugin
-- course content lives in another
-- student accounts feel generic
-- certificates feel bolted on
-- support and enrollment operations are weak after payment
-
-Pressplay LMS was built to make the full buyer and student journey feel like one product.
+- It connects catalog, purchase, access, learning progress, and certificates in one coherent product flow.
+- It keeps students out of `wp-admin` and delivers a branded frontend experience with custom LMS routes.
+- It uses WooCommerce as the payment and order engine without locking the LMS to one single gateway.
+- It includes operational tooling for support teams, not only content delivery for students.
+- It adds a real customization layer with theme-aware and Elementor-aware CSS overrides for the LMS UI.
 
 ---
 
-## Core Capabilities
+## Feature Surface
 
-| Icon | Capability | What it delivers |
-| :--: | --- | --- |
-| 🛒 | Course commerce | Syncs courses with WooCommerce products and uses real checkout and order state transitions |
-| 🔒 | Access control | Handles pending, active, blocked, expired, refunded, cancelled, and failed enrollments |
-| 🎓 | Learning flow | Serves custom course and lesson routes, progress tracking, and resume behavior |
-| 🧾 | Certificates | Unlocks certificate output only after real completion rules are satisfied |
-| 👤 | Student area | Provides a custom library, profile editing, avatar upload, and password management |
-| 🛠️ | Admin operations | Supports extensions, reactivation, filtering, preview flows, and enrollment management |
+| Product pillar | Implemented capabilities |
+| --- | --- |
+| **Commerce & enrollment** | Course-to-product sync, LMS-controlled purchase flow, checkout bootstrap, payment-aware activation, revocation on failed/cancelled/refunded orders, pending and active enrollments, payment method tracking |
+| **Learning experience** | Public catalog, branded course pages, protected lesson routes, lesson progression, resume behavior, progress summaries, certificate unlock on real completion |
+| **Student area** | Custom dashboard, student library, certificate center, profile editing, avatar upload, password management, login-aware redirects |
+| **Content operations** | Course, lesson, and teacher models, lesson materials, Vimeo metadata and embed support, certificate templates with dynamic placeholders, access windows by days, months, years, or lifetime |
+| **Admin tooling** | Enrollment filtering, blocking, reactivation, access extension, password assistance flows, notice handling, student support operations |
+| **Branding & customization** | Theme-compatible frontend rendering, brand-aware public titles, custom CSS editor, Elementor/WordPress/theme variable suggestions, dark editor experience, variable copy shortcuts |
+| **Platform quality** | Custom tables for enrollments and progress, secure action handlers, nonce and capability validation, WooCommerce HPOS compatibility, product instance caching compatibility, release documentation |
 
 ---
 
-## Product Flow
+## Experience Flow
 
 ```mermaid
 flowchart LR
   A[Public Catalog] --> B[Course Page]
-  B --> C[WooCommerce Checkout]
-  C --> D[Pending Enrollment]
-  D --> E[Active Access]
-  E --> F[Lesson Progress]
-  F --> G[Course Completion]
-  G --> H[Certificate Center]
+  B --> C[LMS Enrollment CTA]
+  C --> D[WooCommerce Checkout]
+  D --> E[Pending Enrollment]
+  E --> F[Payment Confirmed]
+  F --> G[Active Access]
+  G --> H[Lesson Progress]
+  H --> I[Course Completion]
+  I --> J[Certificate Center]
 ```
 
 ---
 
-## Frontend Routes
+## Key Differentiators
+
+### 1. Brand-first LMS experience
+
+This plugin does not expose the internal product identity to the final customer. The public experience reflects the brand that installs it, including branded titles and a custom student area that feels native to the site.
+
+### 2. Universal WooCommerce payment strategy
+
+Instead of coupling the LMS to one gateway, Pressplay LMS follows the WooCommerce payment lifecycle. That makes it naturally compatible with well-behaved gateways such as PayPal, Mercado Pago, PagBank/PagSeguro, Stripe, and similar WooCommerce extensions.
+
+### 3. Real operational maturity
+
+The plugin handles more than content access. It includes enrollment status management, access extension, reactivation, blocking, expiration logic, and certificate release rules, which is the kind of detail real businesses need after the sale.
+
+### 4. Advanced theming control
+
+The LMS can keep its default design or accept only the CSS overrides the brand wants to change. The custom CSS editor suggests variables from Elementor, WordPress, and the active theme, which makes visual adaptation much faster and more professional.
+
+---
+
+## What This Project Demonstrates Technically
+
+- Strong WordPress plugin architecture with custom post types, rewrites, admin screens, templates, and lifecycle hooks
+- Deep WooCommerce knowledge across cart, checkout, paid statuses, refunds, and feature compatibility
+- Productized access control using custom tables instead of fragile `postmeta`-only state
+- Secure handling of admin-post, AJAX, permissions, nonces, redirects, and ownership validation
+- Frontend implementation that balances custom product UX with theme compatibility
+- Developer maturity through release notes, internal docs, payment compatibility notes, and collaboration guides
+
+---
+
+## Public Frontend Footprint
 
 | Route | Purpose |
 | --- | --- |
 | `/cursos/` | Public course catalog |
 | `/curso/{course-slug}/` | Course landing page and purchase entry point |
 | `/curso/{course-slug}/aula/{lesson-slug}/` | Protected lesson experience |
-| `/meus-cursos/` | Student library and main dashboard |
+| `/meus-cursos/` | Student dashboard and course library |
 | `/meus-cursos/certificados/` | Certificate center |
 | `/meus-cursos/certificado/{course-slug}/` | Individual certificate output |
-| `/perfil/` | Student account page |
+| `/perfil/` | Student profile page |
 | `/perfil/trocar-senha/` | Password management |
-| `/cadastro/` | Purpose-built student registration |
+| `/cadastro/` | Student registration |
 
 ---
 
@@ -99,12 +133,12 @@ flowchart LR
 
 ```text
 pressplay_lms/
-├── assets/        # Frontend and admin CSS, JS, logo, SVG material icons
-├── docs/          # Collaboration and maintenance documentation
+├── assets/        # Frontend and admin CSS, JS, icons, logos
+├── docs/          # Internal guides for collaboration, payments, releases
 ├── includes/
 │   ├── Core/      # Bootstrap, activation, dependencies, rewrites, templates, assets
 │   ├── Support/   # Shared helpers
-│   └── *.php      # Domain modules such as Woo, Frontend, Enrollments, Progress
+│   └── *.php      # Main LMS modules such as Frontend, Woo, Enrollments, Progress
 ├── templates/
 │   ├── certificado/
 │   ├── frontend/
@@ -113,97 +147,59 @@ pressplay_lms/
 └── uninstall.php
 ```
 
-### Structure Notes
-
-- The current folder layout is already professional for a medium-sized WordPress plugin.
-- `includes/Core` keeps infrastructure separate from business modules.
-- `includes/*.php` keeps major LMS domains shallow and easy to locate.
-- `templates/frontend`, `templates/panel`, and `templates/certificado` make rendering intent obvious.
-- `assets/` is split by file type, which stays intuitive for maintenance and handoff.
-
-### Future Scaling Path
-
-If the plugin grows substantially, the next evolution would be grouping the flat modules inside `includes/` into folders such as:
-
-- `Admin/`
-- `Domain/`
-- `Frontend/`
-- `Integrations/`
-
-That refactor is worth doing only when ownership and file count justify the extra nesting.
-
----
-
-## Main Modules
+### Main modules
 
 | Module | Responsibility |
 | --- | --- |
-| `Frontend.php` | Virtual routes, course rendering, lesson rendering, catalog, student dashboard, registration |
-| `Woo.php` | Product sync, add-to-cart validation, checkout bootstrap, order-based activation and revocation |
-| `Enrollments.php` | Access rules, statuses, expiration windows, reactivation, extension |
-| `Progress.php` | Lesson completion, course summaries, resume logic |
-| `Certificate.php` | Completion validation, placeholder rendering, admin preview, student certificate output |
-| `Actions.php` | Form handlers, AJAX, password updates, enrollment CTA flow |
-| `Settings.php` | Admin settings, enrollment panels, CSS customization tooling |
+| `Frontend.php` | Catalog, course pages, lesson pages, student dashboard, registration, branded page titles |
+| `Woo.php` | Product sync, payment-aware enrollment lifecycle, WooCommerce compatibility |
+| `Enrollments.php` | Access windows, status rules, activation, reactivation, extension, pause handling |
+| `Progress.php` | Lesson tracking, course summaries, completion state |
+| `Certificate.php` | Completion validation, certificate output, admin preview |
+| `Actions.php` | Enrollment CTA flow, profile updates, password changes, AJAX actions |
+| `Settings.php` | Brand settings, admin operations, CSS customization tooling |
 
 ---
 
-## Tech Stack
+## Stack
 
-| Technology | Usage |
+| Technology | Role in the project |
 | --- | --- |
-| WordPress | Plugin runtime, CPTs, hooks, admin UI, rewrite integration |
-| WooCommerce | Product, cart, checkout, and order lifecycle |
-| PHP 8+ | Domain logic, rendering, integrations, validation |
-| Vimeo API | Optional metadata, duration, thumbnail, and embed handling |
-| Theme compatibility layer | Native header and footer rendering with the active theme |
+| WordPress | Plugin runtime, hooks, admin UI, custom post types, media handling |
+| WooCommerce | Products, cart, checkout, order lifecycle, payment state |
+| PHP 8+ | Business rules, rendering, validation, integrations |
+| Vimeo API | Video metadata, embed support, duration and preview workflows |
+| Custom tables | Scalable storage for students, enrollments, and progress |
 
 ---
 
-## Payment Compatibility
+## Why It Feels Production-Ready
 
-Pressplay LMS now follows the WooCommerce payment lifecycle instead of relying on a gateway-specific integration.
-
-- activation listens to `woocommerce_payment_complete`
-- paid access also reacts to WooCommerce paid statuses through `wc_get_is_paid_statuses()`
-- access revocation reacts to invalid order states such as cancelled, failed, and refunded
-- the enrollment record stores the actual WooCommerce payment method used on the order
-
-This keeps the LMS compatible with gateways that correctly update WooCommerce orders, including common setups such as PayPal, Mercado Pago, PagBank/PagSeguro, Stripe, and other well-behaved WooCommerce payment extensions.
-
-Reference notes: [`docs/PAYMENT_COMPATIBILITY.md`](docs/PAYMENT_COMPATIBILITY.md)
+- Supports WooCommerce feature compatibility declarations for modern stores
+- Uses route-driven frontend rendering with active-theme integration
+- Keeps payment support universal through WooCommerce instead of hardcoded provider logic
+- Includes operational documentation for future contributors
+- Has release and versioning guidance for long-term maintenance
 
 ---
 
 ## Developer Docs
 
-- Collaboration guide: [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
-- Release guide: [`docs/RELEASING.md`](docs/RELEASING.md)
-- Payment compatibility notes: [`docs/PAYMENT_COMPATIBILITY.md`](docs/PAYMENT_COMPATIBILITY.md)
-
-Use the developer guide as the baseline for:
-
-- architecture decisions
-- activation and deactivation behavior
-- security-sensitive areas
-- release checks
-- contribution workflow
+- [Developer Guide](docs/DEVELOPER_GUIDE.md)
+- [Release Guide](docs/RELEASING.md)
+- [Payment Compatibility Notes](docs/PAYMENT_COMPATIBILITY.md)
 
 ---
 
 ## Installation
 
 1. Copy the plugin into the WordPress plugins directory.
-2. Activate the plugin in WordPress.
+2. Activate the plugin.
 3. Make sure WooCommerce is active.
-4. Save permalinks once if the custom LMS routes need refreshing.
+4. Save permalinks once if the LMS routes need refreshing.
 
 ---
 
-## Basic Usage
+## Short Portfolio Description
 
-1. Create a course.
-2. Add lessons and a teacher.
-3. Configure pricing and access rules.
-4. Publish the course.
-5. Let students register, purchase, progress through lessons, and generate certificates.
+Pressplay LMS is a custom WordPress LMS plugin built to turn WordPress + WooCommerce into a complete online-course business. It delivers a branded student experience, protected lessons, progress tracking, certificates, payment-aware enrollments, and operational admin tooling in one cohesive product flow.
