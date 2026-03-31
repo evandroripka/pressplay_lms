@@ -91,15 +91,20 @@ class PRESSLMS_Assets
       );
     }
 
-    // Load the shared icon set once for all LMS frontend screens.
-    $fa_base = 'https://site-assets.fontawesome.com/releases/v7.2.0/css/';
-
-    if (!wp_style_is('presslms-fa7-core', 'enqueued')) {
-      wp_enqueue_style('presslms-fa7-core', $fa_base . 'fontawesome.css', [], '7.2.0');
-      wp_enqueue_style('presslms-fa7-light', $fa_base . 'light.css', ['presslms-fa7-core'], '7.2.0');
-      wp_enqueue_style('presslms-fa7-regular', $fa_base . 'regular.css', ['presslms-fa7-core'], '7.2.0');
-      wp_enqueue_style('presslms-fa7-solid', $fa_base . 'solid.css', ['presslms-fa7-core'], '7.2.0');
-      wp_enqueue_style('presslms-fa7-brands', $fa_base . 'brands.css', ['presslms-fa7-core'], '7.2.0');
+    // Bundle a local icon set so LMS pages do not depend on the Font Awesome CDN.
+    if (!wp_style_is('presslms-fa-local', 'enqueued')) {
+      wp_enqueue_style(
+        'presslms-fa-local',
+        PRESS_LMS_URL . 'assets/vendor/fontawesome/css/all.css',
+        [],
+        '5.15.3'
+      );
+      wp_enqueue_style(
+        'presslms-fa-compat',
+        PRESS_LMS_URL . 'assets/css/presslms-fa-compat.css',
+        ['presslms-fa-local'],
+        PRESS_LMS_VERSION
+      );
     }
   }
 

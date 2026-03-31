@@ -1,0 +1,119 @@
+/*
+ * Pressplay LMS uses Font Awesome v6/v7-style class names such as
+ * `.fa-light` and newer icon aliases. This compatibility layer keeps the
+ * markup stable while rendering through the bundled local Font Awesome Free
+ * assets shipped with the plugin.
+ */
+
+.fa-light,
+.fa-regular,
+.fa-solid,
+.fa-brands {
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  line-height: 1;
+  text-rendering: auto;
+}
+
+.fa-light,
+.fa-solid {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+}
+
+.fa-regular {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 400;
+}
+
+.fa-brands {
+  font-family: "Font Awesome 5 Brands";
+  font-weight: 400;
+}
+
+.fa-arrow-left-long:before {
+  content: "\f30a";
+}
+
+.fa-arrow-right-from-bracket:before {
+  content: "\f2f5";
+}
+
+.fa-arrow-right-to-bracket:before {
+  content: "\f2f6";
+}
+
+.fa-arrow-up-right-from-square:before {
+  content: "\f35d";
+}
+
+.fa-arrows-rotate:before {
+  content: "\f2f1";
+}
+
+.fa-bag-shopping:before {
+  content: "\f290";
+}
+
+.fa-bullseye-arrow:before {
+  content: "\f140";
+}
+
+.fa-chalkboard-user:before {
+  content: "\f51c";
+}
+
+.fa-circle-exclamation:before {
+  content: "\f06a";
+}
+
+.fa-circle-info:before {
+  content: "\f05a";
+}
+
+.fa-circle-play:before {
+  content: "\f144";
+}
+
+.fa-file-arrow-down:before {
+  content: "\f56d";
+}
+
+.fa-file-lines:before {
+  content: "\f15c";
+}
+
+.fa-floppy-disk:before {
+  content: "\f0c7";
+}
+
+.fa-list-check:before {
+  content: "\f0ae";
+}
+
+.fa-mobile-screen:before {
+  content: "\f3cd";
+}
+
+.fa-sparkles:before {
+  content: "\f005";
+}
+
+.fa-user-gear:before {
+  content: "\f4fe";
+}
+
+.fa-user-group:before {
+  content: "\f0c0";
+}
+
+.fa-user-pen:before {
+  content: "\f4ff";
+}
+
+.fa-x-twitter:before {
+  content: "\f099";
+}

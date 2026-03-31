@@ -4,11 +4,29 @@ if (!defined('ABSPATH')) exit;
 class PRESS_LMS_Course_Meta
 {
     const META_FEATURES = '_press_course_features';
+    private static $certificate_css_editor_settings = null;
 
     public static function init()
     {
         add_action('add_meta_boxes_press_course', [__CLASS__, 'add_boxes']);
         add_action('save_post_press_course', [__CLASS__, 'save'], 10, 2);
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_admin_assets']);
+    }
+
+    public static function enqueue_admin_assets($hook): void
+    {
+        if (!in_array($hook, ['post.php', 'post-new.php'], true) || !function_exists('get_current_screen')) {
+            return;
+        }
+
+        $screen = get_current_screen();
+        if (!$screen || $screen->post_type !== 'press_course') {
+            return;
+        }
+
+        if (function_exists('wp_enqueue_code_editor')) {
+            self::$certificate_css_editor_settings = wp_enqueue_code_editor(['type' => 'text/css']);
+        }
     }
 
     public static function get_feature_catalog(): array
@@ -254,6 +272,90 @@ class PRESS_LMS_Course_Meta
 </div>';
     }
 
+    public static function get_default_certificate_css(): string
+    {
+        $template = PRESS_LMS_PATH . 'templates/certificado/certificado.css';
+
+        if (file_exists($template)) {
+            $contents = (string) file_get_contents($template);
+            if (trim($contents) !== '') {
+                return trim($contents);
+            }
+        }
+
+        return '';
+    }
+
+    private static function sanitize_certificate_css(string $css): string
+    {
+        $css = wp_unslash($css);
+        $css = str_replace(["\r\n", "\r"], "\n", $css);
+        $css = wp_kses_no_null($css, ['slash_zero' => 'keep']);
+        $css = str_replace(['<?', '?>'], '', $css);
+        $css = preg_replace('#</style#i', '<\\/style', $css);
+
+        return is_string($css) ? trim($css) : '';
+    }
+
+    private static function get_certificate_preview_placeholder_data_uri(
+        string $label,
+        int $width = 420,
+        int $height = 130,
+        string $background = '#f8fafc',
+        string $foreground = '#475569',
+        string $border = '#cbd5e1'
+    ): string {
+        $label = trim($label);
+        if ($label === '') {
+            $label = 'Preview';
+        }
+
+        $svg = sprintf(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="%1$d" height="%2$d" viewBox="0 0 %1$d %2$d" fill="none"><rect width="%1$d" height="%2$d" rx="18" fill="%3$s"/><rect x="1.5" y="1.5" width="%4$d" height="%5$d" rx="16.5" stroke="%6$s" stroke-width="3" stroke-dasharray="10 10"/><text x="50%%" y="50%%" fill="%7$s" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle" dominant-baseline="middle">%8$s</text></svg>',
+            $width,
+            $height,
+            $background,
+            max(0, $width - 3),
+            max(0, $height - 3),
+            $border,
+            $foreground,
+            htmlspecialchars($label, ENT_QUOTES, 'UTF-8')
+        );
+
+        return 'data:image/svg+xml;charset=UTF-8,' . rawurlencode($svg);
+    }
+
+    private static function get_certificate_preview_data(
+        WP_Post $post,
+        string $description,
+        string $logo_url,
+        string $signature_url
+    ): array {
+        $course_title = trim((string) $post->post_title);
+        $duration_seconds = (int) get_post_meta($post->ID, '_press_course_total_duration', true);
+        $course_duration = class_exists('PRESS_LMS_Certificate')
+            ? PRESS_LMS_Certificate::format_seconds($duration_seconds)
+            : '';
+
+        if ($course_duration === '' || $course_duration === '0min') {
+            $course_duration = '8h 00min';
+        }
+
+        if (trim($description) === '') {
+            $description = 'Certificamos que a aluna concluiu esta formação com excelente desempenho técnico, domínio de acabamento e aplicação prática dos protocolos ensinados em aula.';
+        }
+
+        return [
+            'student_name'            => 'Ana Beatriz Souza',
+            'course_name'             => $course_title !== '' ? $course_title : 'Masterclass de Corte Feminino',
+            'course_duration'         => $course_duration,
+            'completion_date'         => date_i18n('d/m/Y'),
+            'certificate_description' => $description,
+            'logo_url'                => $logo_url !== '' ? $logo_url : self::get_certificate_preview_placeholder_data_uri('Logo da marca', 420, 120),
+            'signature_url'           => $signature_url !== '' ? $signature_url : self::get_certificate_preview_placeholder_data_uri('Assinatura', 360, 110, '#f8fafc', '#334155', '#94a3b8'),
+        ];
+    }
+
     public static function add_boxes()
     {
         add_meta_box(
@@ -384,14 +486,25 @@ class PRESS_LMS_Course_Meta
 
         $certificate_logo_url = $certificate_logo_id ? wp_get_attachment_url($certificate_logo_id) : '';
         $certificate_sign_url = $certificate_sign_id ? wp_get_attachment_url($certificate_sign_id) : '';
+        $certificate_preview_data = self::get_certificate_preview_data(
+            $post,
+            $certificate_description,
+            $certificate_logo_url,
+            $certificate_sign_url
+        );
         $lessons_count = count(self::get_course_lessons((int) $post->ID));
         $selected_features = self::get_selected_features((int) $post->ID);
         $features_count = count($selected_features);
 
         $certificate_html = (string) get_post_meta($post->ID, '_press_course_certificate_html', true);
+        $certificate_css = (string) get_post_meta($post->ID, '_press_course_certificate_css', true);
 
         if ($certificate_html === '' || self::is_legacy_default_certificate_html($certificate_html)) {
             $certificate_html = self::get_default_certificate_html();
+        }
+
+        if ($certificate_css === '') {
+            $certificate_css = self::get_default_certificate_css();
         }
 
         echo '<style>
@@ -455,6 +568,162 @@ class PRESS_LMS_Course_Meta
             .press-course-tab__section h3 {
                 margin-top: 0;
             }
+            .press-course-code-field {
+                display: grid;
+                gap: 12px;
+            }
+            .press-course-code-field__intro {
+                margin: 0;
+                color: #646970;
+            }
+            .press-course-code-field__hints {
+                padding: 12px;
+                border: 1px solid #dcdcde;
+                border-radius: 8px;
+                background: #fff;
+                margin-bottom: 12px;
+            }
+            .press-course-code-field__hints code {
+                display: inline-block;
+                margin: 0 6px 6px 0;
+            }
+            .press-course-code-field__textarea {
+                width: 100%;
+                min-height: 360px;
+            }
+            .press-course-code-field--css .press-course-code-field__textarea {
+                min-height: 380px;
+                border: 1px solid #111827;
+                border-radius: 18px;
+                background: #030712;
+                color: #e5edf7;
+                font-family: Consolas, Monaco, "Courier New", monospace;
+                line-height: 1.6;
+                box-shadow: 0 18px 40px rgba(2, 6, 23, 0.18);
+            }
+            .press-course-code-field--css .press-course-code-field__textarea::placeholder {
+                color: #7c89a0;
+            }
+            .press-course-code-field--css .CodeMirror {
+                height: auto;
+                min-height: 380px;
+                border: 1px solid #111827;
+                border-radius: 18px;
+                background: #030712;
+                color: #e5edf7;
+                box-shadow: 0 18px 40px rgba(2, 6, 23, 0.24);
+            }
+            .press-course-code-field--css .CodeMirror-gutters {
+                background: #020617;
+                border-right: 1px solid #111827;
+            }
+            .press-course-code-field--css .CodeMirror-linenumber {
+                color: #61708a;
+            }
+            .press-course-code-field--css .CodeMirror-cursor {
+                border-left: 1px solid #f8fafc;
+            }
+            .press-course-code-field--css .CodeMirror-activeline-background,
+            .press-course-code-field--css .CodeMirror-activeline .CodeMirror-linebackground,
+            .press-course-code-field--css .CodeMirror-activeline-gutter {
+                background: transparent !important;
+            }
+            .press-course-code-field--css .CodeMirror-lines {
+                padding: 16px 0;
+            }
+            .press-course-code-field--css .CodeMirror pre.CodeMirror-line,
+            .press-course-code-field--css .CodeMirror pre.CodeMirror-line-like {
+                padding: 0 16px;
+            }
+            .press-course-code-field--css .cm-s-default .cm-comment {
+                color: #64748b;
+            }
+            .press-course-code-field--css .cm-s-default .cm-atom,
+            .press-course-code-field--css .cm-s-default .cm-number {
+                color: #f9a8d4;
+            }
+            .press-course-code-field--css .cm-s-default .cm-def,
+            .press-course-code-field--css .cm-s-default .cm-variable-2,
+            .press-course-code-field--css .cm-s-default .cm-variable-3 {
+                color: #c4b5fd;
+            }
+            .press-course-code-field--css .cm-s-default .cm-property,
+            .press-course-code-field--css .cm-s-default .cm-attribute,
+            .press-course-code-field--css .cm-s-default .cm-tag {
+                color: #7dd3fc;
+            }
+            .press-course-code-field--css .cm-s-default .cm-string,
+            .press-course-code-field--css .cm-s-default .cm-string-2 {
+                color: #86efac;
+            }
+            .press-course-code-field--css .cm-s-default .cm-keyword,
+            .press-course-code-field--css .cm-s-default .cm-qualifier {
+                color: #fbbf24;
+            }
+            .press-course-code-field--css .cm-s-default .cm-operator,
+            .press-course-code-field--css .cm-s-default .cm-bracket {
+                color: #e2e8f0;
+            }
+            .press-course-code-preview {
+                margin-top: 18px;
+                border: 1px solid #dcdcde;
+                border-radius: 18px;
+                overflow: hidden;
+                background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+                box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+            }
+            .press-course-code-preview__header {
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                align-items: flex-start;
+                padding: 18px 20px 16px;
+                background: linear-gradient(135deg, rgba(15, 23, 42, 0.03), rgba(59, 130, 246, 0.08));
+                border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            }
+            .press-course-code-preview__header h4 {
+                margin: 0 0 4px;
+                font-size: 15px;
+            }
+            .press-course-code-preview__header p {
+                margin: 0;
+                color: #475569;
+            }
+            .press-course-code-preview__badges {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                justify-content: flex-end;
+            }
+            .press-course-code-preview__badges span {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 10px;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.8);
+                border: 1px solid rgba(148, 163, 184, 0.25);
+                color: #0f172a;
+                font-size: 12px;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+            .press-course-code-preview__viewport {
+                padding: 16px;
+                background:
+                    radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 24%),
+                    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.08), transparent 18%),
+                    #e2e8f0;
+            }
+            .press-course-code-preview__frame {
+                display: block;
+                width: 100%;
+                min-height: 760px;
+                border: 0;
+                border-radius: 14px;
+                background: #f8fafc;
+                box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+            }
             .press-course-tab__grid {
                 display: grid;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -515,6 +784,12 @@ class PRESS_LMS_Course_Meta
                 }
                 .press-course-features-grid {
                     grid-template-columns: 1fr;
+                }
+                .press-course-code-preview__header {
+                    flex-direction: column;
+                }
+                .press-course-code-preview__badges {
+                    justify-content: flex-start;
                 }
             }
         </style>';
@@ -602,8 +877,8 @@ class PRESS_LMS_Course_Meta
         echo '<h3>Configurações do Certificado</h3>';
         echo '<p style="margin-top:0;color:#646970;">Personalize textos, imagens e o layout entregue ao aluno.</p>';
 
-        echo '<p><label><strong>Descrição do certificado</strong></label><br>';
-        echo '<textarea name="press_course_certificate_description" class="widefat" rows="4" placeholder="Ex.: Certificamos que o aluno concluiu com êxito este curso e demonstrou domínio dos conteúdos propostos.">' . esc_textarea($certificate_description) . '</textarea></p>';
+        echo '<p><label for="press_course_certificate_description"><strong>Descrição do certificado</strong></label><br>';
+        echo '<textarea id="press_course_certificate_description" name="press_course_certificate_description" class="widefat" rows="4" placeholder="Ex.: Certificamos que o aluno concluiu com êxito este curso e demonstrou domínio dos conteúdos propostos.">' . esc_textarea($certificate_description) . '</textarea></p>';
 
         echo '<div class="press-course-tab__grid">';
 
@@ -632,8 +907,9 @@ class PRESS_LMS_Course_Meta
 
         echo '<div class="press-course-tab__section">';
         echo '<h3>Layout do Certificado</h3>';
-        echo '<p style="color:#666;margin-bottom:8px;">Você pode personalizar o HTML do certificado usando os placeholders abaixo:</p>';
-        echo '<div style="padding:12px;border:1px solid #dcdcde;border-radius:8px;background:#fff;margin-bottom:12px;">';
+        echo '<div class="press-course-code-field">';
+        echo '<p class="press-course-code-field__intro">Personalize a estrutura do certificado em HTML e controle o visual em um campo separado de CSS.</p>';
+        echo '<div class="press-course-code-field__hints">';
         echo '<code>{{student_name}}</code> ';
         echo '<code>{{course_name}}</code> ';
         echo '<code>{{course_duration}}</code> ';
@@ -655,6 +931,28 @@ class PRESS_LMS_Course_Meta
             ]
         );
         echo '</div>';
+
+        echo '<div class="press-course-code-field press-course-code-field--css" style="margin-top:16px;">';
+        echo '<p class="press-course-code-field__intro">CSS do certificado. O editor já carrega o estilo padrão como base para você ajustar o layout sem misturar estrutura e visual.</p>';
+        echo '<textarea id="press_course_certificate_css" name="press_course_certificate_css" class="large-text code press-course-code-field__textarea" rows="20" spellcheck="false" placeholder=".presslms-cert {&#10;  background: #fff;&#10;}">' . esc_textarea($certificate_css) . '</textarea>';
+        echo '</div>';
+
+        echo '<div class="press-course-code-preview">';
+        echo '<div class="press-course-code-preview__header">';
+        echo '<div>';
+        echo '<h4>Pré-visualização em tempo real</h4>';
+        echo '<p>Mostra o certificado com dados fictícios enquanto você altera HTML, CSS, descrição, logo, assinatura e o nome do curso.</p>';
+        echo '</div>';
+        echo '<div class="press-course-code-preview__badges">';
+        echo '<span>Aluno demo: ' . esc_html($certificate_preview_data['student_name']) . '</span>';
+        echo '<span>Conclusão: ' . esc_html($certificate_preview_data['completion_date']) . '</span>';
+        echo '<span>Duração: ' . esc_html($certificate_preview_data['course_duration']) . '</span>';
+        echo '</div>';
+        echo '</div>';
+        echo '<div class="press-course-code-preview__viewport">';
+        echo '<iframe id="press_course_certificate_preview" class="press-course-code-preview__frame" title="Pré-visualização do certificado" sandbox="allow-same-origin"></iframe>';
+        echo '</div>';
+        echo '</div>';
         echo '</div>';
 
         echo '<div class="press-course-tab" data-tab-panel="lessons">';
@@ -665,6 +963,166 @@ class PRESS_LMS_Course_Meta
         <script>
             (function($) {
                 const $tabsRoot = $('#press-course-tabs');
+                const certificatePreviewFrame = document.getElementById('press_course_certificate_preview');
+                const certificateHtmlField = document.getElementById('press_course_certificate_html');
+                const certificateCssEditorField = document.getElementById('press_course_certificate_css');
+                const certificateDescriptionField = document.getElementById('press_course_certificate_description');
+                const courseTitleField = document.getElementById('title');
+                const certificateLogoUrlField = document.getElementById('press_course_certificate_logo_url');
+                const certificateSignatureUrlField = document.getElementById('press_course_certificate_signature_url');
+                const certificatePreviewSeed = <?php echo wp_json_encode($certificate_preview_data); ?>;
+                const certificateCssEditorSettings = <?php echo wp_json_encode(self::$certificate_css_editor_settings); ?>;
+                let certificateCssCodeMirror = null;
+                let certificatePreviewTimer = null;
+
+                function escapeHtml(value) {
+                    return String(value ?? '').replace(/[&<>"']/g, function(character) {
+                        const entities = {
+                            '&': '&amp;',
+                            '<': '&lt;',
+                            '>': '&gt;',
+                            '"': '&quot;',
+                            "'": '&#039;'
+                        };
+
+                        return entities[character] || character;
+                    });
+                }
+
+                function formatDescription(value) {
+                    return escapeHtml(value).replace(/\n/g, '<br>');
+                }
+
+                function replaceCertificatePlaceholders(template, data) {
+                    const replacements = {
+                        '{{student_name}}': escapeHtml(data.student_name || ''),
+                        '{{course_name}}': escapeHtml(data.course_name || ''),
+                        '{{course_duration}}': escapeHtml(data.course_duration || ''),
+                        '{{completion_date}}': escapeHtml(data.completion_date || ''),
+                        '{{certificate_description}}': formatDescription(data.certificate_description || ''),
+                        '{{logo_url}}': escapeHtml(data.logo_url || ''),
+                        '{{signature_url}}': escapeHtml(data.signature_url || '')
+                    };
+
+                    let output = String(template || '');
+
+                    Object.keys(replacements).forEach(function(placeholder) {
+                        output = output.split(placeholder).join(replacements[placeholder]);
+                    });
+
+                    return output;
+                }
+
+                function getPreviewFieldValue(field, fallbackValue) {
+                    if (!field) {
+                        return fallbackValue;
+                    }
+
+                    const value = String(field.value || '').trim();
+
+                    return value !== '' ? value : fallbackValue;
+                }
+
+                function getCertificateHtmlValue() {
+                    const visualEditor = window.tinymce && typeof window.tinymce.get === 'function'
+                        ? window.tinymce.get('press_course_certificate_html')
+                        : null;
+
+                    if (visualEditor && !visualEditor.isHidden()) {
+                        return visualEditor.getContent();
+                    }
+
+                    return certificateHtmlField ? certificateHtmlField.value : '';
+                }
+
+                function getCertificateCssValue() {
+                    if (certificateCssCodeMirror) {
+                        return certificateCssCodeMirror.getValue();
+                    }
+
+                    return certificateCssEditorField ? certificateCssEditorField.value : '';
+                }
+
+                function getCertificatePreviewData() {
+                    return {
+                        student_name: certificatePreviewSeed.student_name || '',
+                        course_name: getPreviewFieldValue(courseTitleField, certificatePreviewSeed.course_name || ''),
+                        course_duration: certificatePreviewSeed.course_duration || '',
+                        completion_date: certificatePreviewSeed.completion_date || '',
+                        certificate_description: getPreviewFieldValue(certificateDescriptionField, certificatePreviewSeed.certificate_description || ''),
+                        logo_url: getPreviewFieldValue(certificateLogoUrlField, certificatePreviewSeed.logo_url || ''),
+                        signature_url: getPreviewFieldValue(certificateSignatureUrlField, certificatePreviewSeed.signature_url || '')
+                    };
+                }
+
+                function buildCertificatePreviewDocument(html, css, data) {
+                    const renderedHtml = replaceCertificatePlaceholders(html, data);
+
+                    return [
+                        '<!DOCTYPE html>',
+                        '<html lang="pt-BR">',
+                        '<head>',
+                        '<meta charset="UTF-8">',
+                        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+                        '<title>Prévia do certificado</title>',
+                        '<style>html{background:#e2e8f0;}body{overflow:auto !important;}</style>',
+                        css ? '<style>\n' + css + '\n</style>' : '',
+                        '</head>',
+                        '<body>',
+                        renderedHtml,
+                        '</body>',
+                        '</html>'
+                    ].join('');
+                }
+
+                function renderCertificatePreview() {
+                    if (!certificatePreviewFrame) {
+                        return;
+                    }
+
+                    const previewDocument = buildCertificatePreviewDocument(
+                        getCertificateHtmlValue(),
+                        getCertificateCssValue(),
+                        getCertificatePreviewData()
+                    );
+
+                    if ('srcdoc' in certificatePreviewFrame) {
+                        certificatePreviewFrame.srcdoc = previewDocument;
+                        return;
+                    }
+
+                    const frameDocument = certificatePreviewFrame.contentWindow
+                        ? certificatePreviewFrame.contentWindow.document
+                        : null;
+
+                    if (!frameDocument) {
+                        return;
+                    }
+
+                    frameDocument.open();
+                    frameDocument.write(previewDocument);
+                    frameDocument.close();
+                }
+
+                function scheduleCertificatePreviewRender() {
+                    window.clearTimeout(certificatePreviewTimer);
+                    certificatePreviewTimer = window.setTimeout(renderCertificatePreview, 120);
+                }
+
+                function bindCertificateTinyMcePreview() {
+                    if (!(window.tinymce && typeof window.tinymce.get === 'function')) {
+                        return;
+                    }
+
+                    const editor = window.tinymce.get('press_course_certificate_html');
+
+                    if (!editor || editor.__pressLmsPreviewBound) {
+                        return;
+                    }
+
+                    editor.__pressLmsPreviewBound = true;
+                    editor.on('keyup change input SetContent Undo Redo NodeChange', scheduleCertificatePreviewRender);
+                }
 
                 if ($tabsRoot.length) {
                     const $buttons = $tabsRoot.find('.press-course-tabs__btn');
@@ -691,6 +1149,9 @@ class PRESS_LMS_Course_Meta
                                 if (editor) {
                                     editor.execCommand('mceRepaint');
                                 }
+
+                                bindCertificateTinyMcePreview();
+                                scheduleCertificatePreviewRender();
                             }, 50);
                         }
                     }
@@ -715,6 +1176,7 @@ class PRESS_LMS_Course_Meta
                         const attachment = frame.state().get('selection').first().toJSON();
                         $('#' + targetId).val(attachment.id);
                         $('#' + targetUrlId).val(attachment.url);
+                        scheduleCertificatePreviewRender();
                     });
 
                     frame.open();
@@ -759,17 +1221,69 @@ class PRESS_LMS_Course_Meta
                     e.preventDefault();
                     $('#press_course_certificate_logo_id').val('');
                     $('#press_course_certificate_logo_url').val('');
+                    scheduleCertificatePreviewRender();
                 });
 
                 $('#press_clear_certificate_signature').on('click', function(e) {
                     e.preventDefault();
                     $('#press_course_certificate_signature_id').val('');
                     $('#press_course_certificate_signature_url').val('');
+                    scheduleCertificatePreviewRender();
                 });
 
                 $('#press_course_access_type').on('change', updateAccessDurationField);
                 $('#press_course_access_value').on('input', updateAccessDurationField);
                 updateAccessDurationField();
+
+                if (
+                    certificateCssEditorField &&
+                    certificateCssEditorSettings &&
+                    window.wp &&
+                    wp.codeEditor &&
+                    typeof wp.codeEditor.initialize === 'function'
+                ) {
+                    const certificateCssEditorInstance = wp.codeEditor.initialize(certificateCssEditorField, certificateCssEditorSettings);
+
+                    if (certificateCssEditorInstance && certificateCssEditorInstance.codemirror) {
+                        certificateCssCodeMirror = certificateCssEditorInstance.codemirror;
+                        certificateCssCodeMirror.on('change', scheduleCertificatePreviewRender);
+                    }
+                } else if (certificateCssEditorField) {
+                    $(certificateCssEditorField).on('input change', scheduleCertificatePreviewRender);
+                }
+
+                if (certificateHtmlField) {
+                    $(certificateHtmlField).on('input change', scheduleCertificatePreviewRender);
+                }
+
+                if (certificateDescriptionField) {
+                    $(certificateDescriptionField).on('input change', scheduleCertificatePreviewRender);
+                }
+
+                if (courseTitleField) {
+                    $(courseTitleField).on('input change', scheduleCertificatePreviewRender);
+                }
+
+                if (certificateLogoUrlField) {
+                    $(certificateLogoUrlField).on('change', scheduleCertificatePreviewRender);
+                }
+
+                if (certificateSignatureUrlField) {
+                    $(certificateSignatureUrlField).on('change', scheduleCertificatePreviewRender);
+                }
+
+                if (window.tinymce) {
+                    bindCertificateTinyMcePreview();
+
+                    $(document).on('tinymce-editor-init', function(event, editor) {
+                        if (editor && editor.id === 'press_course_certificate_html') {
+                            bindCertificateTinyMcePreview();
+                            scheduleCertificatePreviewRender();
+                        }
+                    });
+                }
+
+                scheduleCertificatePreviewRender();
             })(jQuery);
         </script>
 <?php
@@ -790,6 +1304,14 @@ class PRESS_LMS_Course_Meta
                 $post_id,
                 '_press_course_certificate_html',
                 wp_kses_post((string) wp_unslash($_POST['press_course_certificate_html']))
+            );
+        }
+
+        if (isset($_POST['press_course_certificate_css'])) {
+            update_post_meta(
+                $post_id,
+                '_press_course_certificate_css',
+                self::sanitize_certificate_css((string) $_POST['press_course_certificate_css'])
             );
         }
 

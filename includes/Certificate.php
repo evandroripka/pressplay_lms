@@ -100,6 +100,7 @@ class PRESS_LMS_Certificate
         $signature_id    = (int) get_post_meta($course_id, '_press_course_certificate_signature_id', true);
 
         $custom_html     = (string) get_post_meta($course_id, '_press_course_certificate_html', true);
+        $custom_css      = (string) get_post_meta($course_id, '_press_course_certificate_css', true);
 
         $logo_url = self::resolve_image_url(
             $logo_id,
@@ -123,6 +124,7 @@ class PRESS_LMS_Certificate
             'logo_url'         => $logo_url,
             'signature_url'    => $signature_url,
             'custom_html'      => $custom_html,
+            'custom_css'       => $custom_css,
         ];
     }
 
@@ -145,6 +147,24 @@ class PRESS_LMS_Certificate
 
         if (file_exists($template)) {
             return (string) file_get_contents($template);
+        }
+
+        return '';
+    }
+
+    public static function get_certificate_css_template(int $course_id): string
+    {
+        $css = (string) get_post_meta($course_id, '_press_course_certificate_css', true);
+
+        if (trim($css) !== '') {
+            return trim($css);
+        }
+
+        if (
+            class_exists('PRESS_LMS_Course_Meta') &&
+            method_exists('PRESS_LMS_Course_Meta', 'get_default_certificate_css')
+        ) {
+            return (string) PRESS_LMS_Course_Meta::get_default_certificate_css();
         }
 
         return '';
@@ -221,266 +241,22 @@ class PRESS_LMS_Certificate
         return strtr($html, $map);
     }
 
-    public static function get_certificate_styles(): string
+    public static function get_certificate_styles(string $css = ''): string
     {
-        return '
-    <style>
-        @page {
-            size: A4 landscape;
-            margin: 0;
+        $css = trim($css);
+
+        if ($css === '') {
+            return '';
         }
 
-        * {
-            box-sizing: border-box;
-        }
-
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 297mm;
-            height: 210mm;
-            background: #eef2f7;
-            font-family: "Inter", "Segoe UI", Arial, sans-serif;
-            color: #0f172a;
-        }
-
-        body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .presslms-cert {
-            width: 297mm;
-            height: 210mm;
-            background:
-                radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 25%),
-                radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.08), transparent 20%),
-                #ffffff;
-            border-radius: 0;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .presslms-cert__topbar {
-            height: 4mm;
-            background: linear-gradient(90deg, #2563eb, #10b981);
-        }
-
-        .presslms-cert__inner {
-            padding: 18mm 22mm 16mm;
-            height: calc(210mm - 4mm);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .presslms-cert__badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-            color: #1d4ed8;
-            background: rgba(37, 99, 235, 0.08);
-            border: 1px solid rgba(37, 99, 235, 0.12);
-            margin-bottom: 14px;
-        }
-
-        .presslms-cert__logo {
-            text-align: center;
-            margin-bottom: 14px;
-        }
-
-        .presslms-cert__logo img {
-            max-height: 22mm;
-            max-width: 68mm;
-            object-fit: contain;
-        }
-
-        .presslms-cert__title {
-            text-align: center;
-            font-size: 42px;
-            line-height: 1.1;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            color: #0f172a;
-            margin: 0 0 8px;
-        }
-
-        .presslms-cert__subtitle {
-            text-align: center;
-            font-size: 17px;
-            color: #475569;
-            margin: 0 0 18px;
-        }
-
-        .presslms-cert__student {
-            text-align: center;
-            font-size: 38px;
-            line-height: 1.15;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            color: #1d4ed8;
-            margin: 0 0 16px;
-        }
-
-        .presslms-cert__text {
-            max-width: 220mm;
-            margin: 0 auto 12px;
-            text-align: center;
-            font-size: 18px;
-            line-height: 1.7;
-            color: #334155;
-        }
-
-        .presslms-cert__course {
-            max-width: 220mm;
-            margin: 0 auto 16px;
-            text-align: center;
-            font-size: 28px;
-            line-height: 1.3;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            color: #0f172a;
-        }
-
-        .presslms-cert__description {
-            max-width: 220mm;
-            margin: 0 auto 18px;
-            text-align: center;
-            font-size: 16px;
-            line-height: 1.7;
-            color: #475569;
-        }
-
-        .presslms-cert__meta-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-            max-width: 190mm;
-            margin: 18px auto 0;
-        }
-
-        .presslms-cert__meta-card {
-            padding: 14px 16px;
-            border-radius: 14px;
-            background: #f8fafc;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            text-align: center;
-        }
-
-        .presslms-cert__meta-label {
-            font-size: 11px;
-            font-weight: 700;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 6px;
-        }
-
-        .presslms-cert__meta-value {
-            font-size: 18px;
-            font-weight: 700;
-            color: #0f172a;
-        }
-
-        .presslms-cert__footer {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 24px;
-            margin-top: auto;
-            padding-top: 18px;
-        }
-
-        .presslms-cert__signature-block {
-            flex: 1;
-            max-width: 90mm;
-            text-align: center;
-        }
-
-        .presslms-cert__signature-block img {
-            max-height: 20mm;
-            max-width: 60mm;
-            object-fit: contain;
-            margin-bottom: 8px;
-        }
-
-        .presslms-cert__line {
-            height: 1px;
-            background: rgba(15, 23, 42, 0.22);
-        }
-
-        .presslms-cert__label {
-            margin-top: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            color: #334155;
-        }
-
-        .presslms-cert__seal {
-            width: 32mm;
-            height: 32mm;
-            border-radius: 999px;
-            border: 2px solid rgba(16, 185, 129, 0.22);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            color: #10b981;
-            background: rgba(16, 185, 129, 0.05);
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            flex-shrink: 0;
-        }
-
-        .presslms-cert__seal strong {
-            font-size: 16px;
-            line-height: 1;
-            margin-top: 4px;
-        }
-
-        @media screen {
-            body {
-                padding: 10mm;
-            }
-
-            .presslms-cert {
-                border-radius: 20px;
-                box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
-            }
-        }
-
-        @media print {
-            html,
-            body {
-                background: #ffffff;
-            }
-
-            body {
-                padding: 0;
-            }
-
-            .presslms-cert {
-                box-shadow: none;
-            }
-        }
-    </style>';
+        return "<style>\n" . $css . "\n</style>";
     }
 
     public static function render_certificate_html(array $data): void
     {
         $course_id = (int) ($data['course_id'] ?? 0);
         $html = self::get_certificate_html_template($course_id);
+        $css = self::get_certificate_css_template($course_id);
 
         if (trim($html) === '') {
             wp_die('Template do certificado não encontrado.');
@@ -494,7 +270,7 @@ class PRESS_LMS_Certificate
         echo '<meta charset="UTF-8">';
         echo '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
         echo '<title>Certificado - ' . esc_html($data['course_name'] ?? 'Curso') . '</title>';
-        echo self::get_certificate_styles();
+        echo self::get_certificate_styles($css);
         echo '</head>';
         echo '<body>';
         echo wp_kses_post($html);

@@ -6,6 +6,23 @@ if (!defined('ABSPATH')) exit;
  */
 class PRESS_LMS_Plugin
 {
+    private static function enqueue_icon_assets(): void
+    {
+        wp_enqueue_style(
+            'presslms-fa-local',
+            PRESS_LMS_URL . 'assets/vendor/fontawesome/css/all.css',
+            [],
+            '5.15.3'
+        );
+
+        wp_enqueue_style(
+            'presslms-fa-compat',
+            PRESS_LMS_URL . 'assets/css/presslms-fa-compat.css',
+            ['presslms-fa-local'],
+            PRESS_LMS_VERSION
+        );
+    }
+
     public static function register(): void
     {
         register_activation_hook(PRESS_LMS_FILE, ['PRESS_LMS_Activator', 'activate']);
@@ -53,6 +70,7 @@ class PRESS_LMS_Plugin
             return;
         }
 
+        self::enqueue_icon_assets();
         wp_enqueue_style('press-lms-admin', PRESS_LMS_URL . 'assets/css/admin.css', [], PRESS_LMS_VERSION);
     }
 
