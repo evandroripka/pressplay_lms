@@ -11,7 +11,10 @@ $course_access_label = (string) ($course_access_label_var ?? '');
 $course_notice = is_array($course_notice_var ?? null) ? $course_notice_var : null;
 $lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 $course_thumbnail_url = get_the_post_thumbnail_url($course->ID, 'medium_large') ?: '';
-$course_duration_seconds = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
+$course_description = PRESS_LMS_Helpers::render_post_content($course);
+$trailer_id = PRESS_LMS_Vimeo::parse_video_id($trailer);
+$trailer_embed = $trailer_id ? PRESS_LMS_Vimeo::get_embed_html($trailer_id, 960, $trailer, true) : ($trailer !== '' ? wp_oembed_get($trailer) : '');
+$course_duration_seconds = PRESSLMS_Duration::get_course_total_duration((int) $course->ID);
 $course_features = class_exists('PRESS_LMS_Course_Meta')
   ? PRESS_LMS_Course_Meta::get_selected_features((int) $course->ID)
   : [];
@@ -21,7 +24,8 @@ $product_id       = (int) ($product_id_var ?? 0);
 $is_paused        = class_exists('PRESS_LMS_Enrollments')
   ? PRESS_LMS_Enrollments::is_course_paused((int) $course->ID)
   : false;
-$can_start_enrollment = !$can_access && !$is_paused && $product_id > 0;
+$product = $product_id > 0 && function_exists('wc_get_product') ? wc_get_product($product_id) : null;
+$can_start_enrollment = !$can_access && !$is_paused && $product && $product->is_purchasable() && $product->is_in_stock();
 
 if (!function_exists('presslms_course_format_seconds')) {
   function presslms_course_format_seconds($seconds): string
@@ -64,15 +68,13 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
             <i class="fa-light fa-circle-info"></i>
             Última atualização: <b><?php echo esc_html(get_the_modified_date('d/m/Y', $course)); ?></b>
           </span>
-          <span class="presslms-chip">
           <?php
           $teacher_id = (int) get_post_meta($course->ID, '_press_course_teacher', true);
-          if ($teacher_id) {
-            $teacher = get_post($teacher_id);
-            echo 'Instrutor: <b>' . esc_html($teacher->post_title) . '</b>';
+          $teacher = $teacher_id ? get_post($teacher_id) : null;
+          if ($teacher instanceof WP_Post) {
+            echo '<span class="presslms-chip">Instrutor: <b>' . esc_html($teacher->post_title) . '</b></span>';
           }
           ?>
-          </span>
           <span class="presslms-chip">
             <i class="fa-light fa-layer-group"></i>
             <b><?php echo esc_html(count($lessons)); ?></b> aulas
@@ -90,20 +92,22 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
             </span>
           <?php endif; ?>
         </div>
+        <?php if (trim($course_description) !== ''): ?>
         <div class="presslms-course-hero__about presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2"><i class="fa-light fa-bullseye-arrow"></i> O que você aprenderá</h2>
           </div>
           <div class="presslms-content">
-            <?php echo apply_filters('the_content', $course->post_content); ?>
+            <?php echo $course_description; ?>
           </div>
         </div>
+        <?php endif; ?>
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2"><i class="fa-light fa-list-check"></i> Conteúdo do curso</h2>
           </div>
           <?php if (!$lessons || count($lessons) === 0): ?>
-            <p class="presslms-muted">Nenhuma aula cadastrada ainda.</p>
+            <p class="presslms-muted">Este curso ainda não possui aulas publicadas. Consulte a equipe sobre a disponibilidade do conteúdo antes de se matricular.</p>
           <?php else: ?>
             <div class="presslms-course-lessons">
               <?php foreach ($lessons as $idx => $lesson):
@@ -113,11 +117,13 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
                   : ($course_thumbnail_url ?: '');
                 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
                 $lesson_label = sprintf('Aula %02d', $idx + 1);
+                $is_sample = PRESS_LMS_Helpers::is_sample_lesson((int) $lesson->ID, (int) $course->ID);
               ?>
                 <a
                   class="presslms-course-lessons__item"
                   href="<?php echo esc_url($lesson_url); ?>"
                   data-presslms-lesson-link="1"
+                  data-free-preview="<?php echo $is_sample ? '1' : '0'; ?>"
                 >
                   <span class="presslms-course-lessons__thumb" aria-hidden="true">
                     <?php if ($lesson_thumbnail_url): ?>
@@ -133,6 +139,7 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
                   </span>
                   <span class="presslms-course-lessons__body">
                     <span class="presslms-course-lessons__eyebrow"><?php echo esc_html($lesson_label); ?></span>
+                    <?php if ($is_sample): ?><span class="presslms-sample-label">Aula grátis</span><?php endif; ?>
                     <span class="presslms-course-lessons__title"><?php echo esc_html($lesson->post_title); ?></span>
                     <?php if ($lesson_duration > 0): ?>
                       <span class="presslms-course-lessons__meta">
@@ -149,29 +156,30 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
             </div>
           <?php endif; ?>
         </section>
+        <?php PRESS_LMS_Materials::render_course_downloads((int) $course->ID); ?>
       </div>
       <aside class="presslms-course-hero__right">
         <section class="presslms-card presslms-course-side">
-          <div class="presslms-course-side__media">
-            <?php
-            if ($trailer) {
-              $embed = wp_oembed_get($trailer);
-              if ($embed) {
-                echo '<div class="presslms-course-side__ratio">' . $embed . '</div>';
-              } else {
-                echo '<div class="presslms-course-side__placeholder">TRAILER DO CURSO</div>';
-              }
-            } else {
-              echo '<div class="presslms-course-side__placeholder">TRAILER DO CURSO</div>';
-            }
-            ?>
-          </div>
+          <?php if ($trailer_embed || $course_thumbnail_url): ?>
+            <div class="presslms-course-side__media">
+              <?php if ($trailer_embed): ?>
+                <div class="presslms-course-side__ratio" id="presslms-trailer-player"><?php echo $trailer_embed; ?></div>
+              <?php else: ?>
+                <img class="presslms-course-side__cover" src="<?php echo esc_url($course_thumbnail_url); ?>" alt="<?php echo esc_attr($course->post_title); ?>">
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
           <div class="presslms-course-side__cta">
+            <?php if (!$can_access && $product && $product->get_price() !== ''): ?>
+              <div class="presslms-course-price" aria-label="Valor do curso"><?php echo wp_kses_post($product->get_price_html()); ?></div>
+            <?php endif; ?>
             <?php if ($can_access && $first_lesson_url): ?>
               <a class="presslms-btn presslms-btn--primary presslms-course-side__btn" href="<?php echo esc_url($first_lesson_url); ?>">
                 <i class="fa-light fa-arrow-right-to-bracket"></i>
-                Acessar Curso
+                Continuar curso
               </a>
+            <?php elseif ($can_access): ?>
+              <p class="presslms-muted">Seu acesso está ativo. As aulas serão disponibilizadas em breve.</p>
             <?php elseif ($is_paused): ?>
               <button class="presslms-btn presslms-btn--primary presslms-course-side__btn" type="button" disabled>
                 <i class="fa-light fa-pause"></i>
@@ -188,8 +196,8 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
                 <i class="fa-light fa-bag-shopping"></i>
                 Comprar Curso
               </button>
-              <?php if ($product_id <= 0): ?>
-                <p class="presslms-muted" style="margin:10px 0 0;">Produto do WooCommerce ainda não gerado.</p>
+              <?php if (!$can_start_enrollment): ?>
+                <p class="presslms-muted" style="margin:10px 0 0;">Matrículas temporariamente indisponíveis.</p>
               <?php endif; ?>
             <?php endif; ?>
           </div>
@@ -206,6 +214,7 @@ $course_duration_label = class_exists('PRESS_LMS_Certificate')
               </ul>
             </div>
           <?php endif; ?>
+          <div class="presslms-course-side__includes"><?php PRESS_LMS_Terms::render_course((int) $course->ID); ?></div>
         </section>
       </aside>
     </header>

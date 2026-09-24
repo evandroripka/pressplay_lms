@@ -12,12 +12,12 @@ class PRESS_LMS_Frontend
 
     public static function header($title = 'Pressplay')
     {
-        status_header(200);
-        nocache_headers();
-
         if (self::$theme_compat_mode) {
             return;
         }
+
+        status_header(self::get_route_status());
+        nocache_headers();
 
         echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
         echo '<title>' . esc_html($title) . '</title>';
@@ -72,6 +72,31 @@ class PRESS_LMS_Frontend
         $context = self::get_current_frontend_route();
 
         return in_array((string) ($context['type'] ?? ''), ['lesson', 'course', 'catalog', 'student', 'register'], true);
+    }
+
+    public static function resolve_route_post()
+    {
+        $route = self::get_current_frontend_route();
+        if (!in_array($route['type'], ['course', 'lesson'], true)) {
+            return null;
+        }
+        $course = PRESS_LMS_Helpers::get_visible_course((string) $route['course_slug']);
+        if (!$course || $route['type'] === 'course') {
+            return $course;
+        }
+        $lesson = self::find_lesson_for_course((string) $route['lesson_slug'], (int) $course->ID);
+        if (!$lesson) {
+            return null;
+        }
+        // Theme widgets must not see protected lesson content before enrollment.
+        return (PRESS_LMS_Enrollments::can_access_course(get_current_user_id(), (int) $course->ID)
+            || PRESS_LMS_Helpers::is_sample_lesson((int) $lesson->ID, (int) $course->ID)) ? $lesson : $course;
+    }
+
+    public static function get_route_status(): int
+    {
+        $route = self::get_current_frontend_route();
+        return in_array($route['type'], ['course', 'lesson'], true) && !self::resolve_route_post() ? 404 : 200;
     }
 
     public static function get_current_frontend_route(): array
@@ -142,7 +167,7 @@ class PRESS_LMS_Frontend
         }
 
         if ($route_type === 'course') {
-            $course = get_page_by_path((string) ($context['course_slug'] ?? ''), OBJECT, 'press_course');
+            $course = PRESS_LMS_Helpers::get_visible_course((string) ($context['course_slug'] ?? ''));
 
             return $course instanceof WP_Post
                 ? self::get_public_page_title((string) $course->post_title)
@@ -150,7 +175,7 @@ class PRESS_LMS_Frontend
         }
 
         if ($route_type === 'lesson') {
-            $course = get_page_by_path((string) ($context['course_slug'] ?? ''), OBJECT, 'press_course');
+            $course = PRESS_LMS_Helpers::get_visible_course((string) ($context['course_slug'] ?? ''));
             $lesson = $course instanceof WP_Post
                 ? self::find_lesson_for_course((string) ($context['lesson_slug'] ?? ''), (int) $course->ID)
                 : null;
@@ -628,10 +653,10 @@ class PRESS_LMS_Frontend
         );
 
         $display_name = '';
-        if ($student && !empty($student->full_name)) {
-            $display_name = (string) $student->full_name;
-        } elseif (!empty($user->display_name)) {
+        if (!empty($user->display_name)) {
             $display_name = (string) $user->display_name;
+        } elseif ($student && !empty($student->full_name)) {
+            $display_name = (string) $student->full_name;
         } elseif (!empty($user->first_name)) {
             $display_name = (string) $user->first_name;
         } else {
@@ -663,7 +688,7 @@ class PRESS_LMS_Frontend
             'id' => $user_id,
             'display_name' => $display_name,
             'email' => (string) $user->user_email,
-            'phone' => $student ? (string) ($student->phone_raw ?? '') : '',
+            'phone' => $student ? (string) ($student->phone_raw ?? '') : (string) get_user_meta($user_id, 'billing_phone', true),
             'registered_at' => $registered_at,
             'avatar_url' => class_exists('PRESS_LMS_Helpers')
                 ? PRESS_LMS_Helpers::get_student_avatar_url($user_id, 96)
@@ -707,7 +732,7 @@ class PRESS_LMS_Frontend
             ? PRESS_LMS_Certificate::get_course_completed_at($user_id, $course_id)
             : '';
 
-        $course_duration_seconds = (int) get_post_meta($course_id, '_press_course_total_duration', true);
+        $course_duration_seconds = PRESSLMS_Duration::get_course_total_duration($course_id);
         $duration_label = class_exists('PRESS_LMS_Certificate')
             ? PRESS_LMS_Certificate::format_seconds($course_duration_seconds)
             : '';
@@ -742,6 +767,13 @@ class PRESS_LMS_Frontend
         $resume_label = $has_access
             ? ($is_completed ? 'Revisar curso' : 'Continuar curso')
             : 'Ver curso';
+        if (!$has_access && !empty($enrollment->order_ref) && function_exists('wc_get_order')) {
+            $order = wc_get_order((int) $enrollment->order_ref);
+            if ($order && (int) $order->get_user_id() === $user_id && $order->needs_payment()) {
+                $resume_url = $order->get_checkout_payment_url();
+                $resume_label = 'Retomar pagamento';
+            }
+        }
         $learning_status_label = $is_completed
             ? 'Concluído'
             : ((int) ($progress['completed'] ?? 0) > 0 ? 'Em andamento' : 'Não iniciado');
@@ -762,7 +794,7 @@ class PRESS_LMS_Frontend
             'access_expires_label' => $access_expires_label,
             'access_status_label' => $access_status_label,
             'has_access' => $has_access,
-            'progress_percent' => (int) ($progress['percent'] ?? 0),
+            'progress_percent' => (float) ($progress['percent'] ?? 0),
             'completed_lessons' => (int) ($progress['completed'] ?? 0),
             'total_lessons' => (int) ($progress['total'] ?? 0),
             'status_label' => $access_status_label,
@@ -785,12 +817,15 @@ class PRESS_LMS_Frontend
             ? PRESS_LMS_Enrollments::get_user_enrollments($user_id, ['include_pending' => true])
             : [];
 
+        $seen_courses = [];
         foreach ($enrollments as $enrollment) {
+            if (isset($seen_courses[(int) $enrollment->course_id])) continue;
             $course_data = self::build_student_dashboard_course($user_id, $enrollment);
             if (!$course_data) {
                 continue;
             }
 
+            $seen_courses[(int) $enrollment->course_id] = true;
             $courses[] = $course_data;
             if (!empty($course_data['has_access'])) {
                 $active_courses++;
@@ -847,7 +882,7 @@ class PRESS_LMS_Frontend
                 ? PRESS_LMS_Progress::get_course_progress_summary($user_id, $course_id)
                 : ['percent' => 0];
 
-            $progress_percent = (int) ($progress['percent'] ?? 0);
+            $progress_percent = (float) ($progress['percent'] ?? 0);
             $primary_label = $progress_percent >= 100 ? 'Revisar curso' : 'Continuar curso';
         }
 
@@ -865,7 +900,7 @@ class PRESS_LMS_Frontend
             $thumbnail_url = PRESS_LMS_Helpers::get_lesson_thumbnail_url((int) $first_lesson->ID, $course_id, 'large');
         }
 
-        $course_duration_seconds = (int) get_post_meta($course_id, '_press_course_total_duration', true);
+        $course_duration_seconds = PRESSLMS_Duration::get_course_total_duration($course_id);
         $duration_label = class_exists('PRESS_LMS_Certificate')
             ? PRESS_LMS_Certificate::format_seconds($course_duration_seconds)
             : '';
@@ -924,7 +959,7 @@ class PRESS_LMS_Frontend
             exit;
         }
 
-        $course = get_page_by_path($course_slug, OBJECT, 'press_course');
+        $course = PRESS_LMS_Helpers::get_visible_course($course_slug);
         if (!$course instanceof WP_Post) {
             wp_safe_redirect(self::get_student_area_url('certificates', [
                 'notice' => 'certificate_course_invalid',
@@ -981,7 +1016,7 @@ class PRESS_LMS_Frontend
             $courses[] = $course_data;
             $total_lessons += (int) ($course_data['lessons_count'] ?? 0);
 
-            $course_duration_seconds = (int) get_post_meta((int) $course->ID, '_press_course_total_duration', true);
+            $course_duration_seconds = PRESSLMS_Duration::get_course_total_duration((int) $course->ID);
             $total_duration_seconds += max(0, $course_duration_seconds);
         }
 
@@ -1117,7 +1152,7 @@ class PRESS_LMS_Frontend
         ]);
 
         foreach ($candidates as $lesson) {
-            if (!$lesson instanceof WP_Post) {
+            if (!PRESS_LMS_Helpers::is_viewable_post($lesson, 'press_lesson')) {
                 continue;
             }
 
@@ -1132,7 +1167,7 @@ class PRESS_LMS_Frontend
         }
 
         foreach (PRESS_LMS_Helpers::get_course_lessons($course_id, ['publish', 'draft', 'pending', 'private', 'future']) as $lesson) {
-            if ($lesson instanceof WP_Post && $lesson->post_name === $lesson_slug) {
+            if (PRESS_LMS_Helpers::is_viewable_post($lesson, 'press_lesson') && $lesson->post_name === $lesson_slug) {
                 return $lesson;
             }
         }
@@ -1142,7 +1177,7 @@ class PRESS_LMS_Frontend
 
     public static function render_course_by_slug($slug)
     {
-        $course = get_page_by_path($slug, OBJECT, 'press_course');
+        $course = PRESS_LMS_Helpers::get_visible_course((string) $slug);
 
         self::header($course instanceof WP_Post
             ? self::get_public_page_title((string) $course->post_title)
@@ -1161,8 +1196,9 @@ class PRESS_LMS_Frontend
         $trailer = get_post_meta($course->ID, '_press_course_trailer', true);
         $lessons = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
         $first_lesson_url = '';
-        if (!empty($lessons[0]) && $lessons[0] instanceof WP_Post) {
-            $first_lesson_url = home_url('/curso/' . $slug . '/aula/' . $lessons[0]->post_name . '/');
+        $next_lesson = $can_access ? PRESS_LMS_Progress::get_next_lesson_for_user($user_id, (int) $course->ID) : ($lessons[0] ?? null);
+        if ($next_lesson instanceof WP_Post) {
+            $first_lesson_url = home_url('/curso/' . $slug . '/aula/' . $next_lesson->post_name . '/');
         }
         $course_access_label = class_exists('PRESS_LMS_Enrollments')
             ? PRESS_LMS_Enrollments::get_course_access_label((int) $course->ID)
@@ -1193,7 +1229,7 @@ class PRESS_LMS_Frontend
 
     public static function render_lesson_by_slug($course_slug, $lesson_slug)
     {
-        $course = get_page_by_path($course_slug, OBJECT, 'press_course');
+        $course = PRESS_LMS_Helpers::get_visible_course((string) $course_slug);
         $lesson = $course ? self::find_lesson_for_course((string) $lesson_slug, (int) $course->ID) : null;
 
         // Stop early when either the course or the lesson cannot be resolved.
@@ -1226,7 +1262,7 @@ class PRESS_LMS_Frontend
         $user_id = get_current_user_id();
         $can_access = PRESS_LMS_Enrollments::can_access_course($user_id, (int)$course->ID);
 
-        if (!$can_access) {
+        if (!$can_access && !PRESS_LMS_Helpers::is_sample_lesson((int) $lesson->ID, (int) $course->ID)) {
             self::header(self::get_public_page_title('Aula restrita'));
             echo '<div class="press-container"><div class="press-card">';
             echo '<h1 class="press-title">Conteúdo restrito</h1>';

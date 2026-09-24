@@ -51,14 +51,11 @@ class PRESS_LMS_Vimeo
         // https://player.vimeo.com/video/123456789
         // https://vimeo.com/manage/videos/123456789
         // https://vimeo.com/123456789/abcdef
-        if (preg_match('~vimeo\.com/(?:video/|manage/videos/)?(\d+)~i', $url, $m)) {
-            return (int)$m[1];
+        $parts = wp_parse_url($url);
+        if (!in_array(strtolower((string) ($parts['host'] ?? '')), ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'], true)) {
+            return null;
         }
-
-        if (preg_match('~player\.vimeo\.com/video/(\d+)~i', $url, $m)) {
-            return (int)$m[1];
-        }
-        if (preg_match('~vimeo\.com/(?:video/|manage/videos/|ondemand/[^/]+/)?(\d+)~i', $url, $m)) {
+        if (preg_match('~^/(?:video/|manage/videos/|ondemand/[^/]+/)?(\d+)(?:/|$)~', (string) ($parts['path'] ?? ''), $m)) {
             return (int)$m[1];
         }
 
@@ -105,8 +102,45 @@ class PRESS_LMS_Vimeo
         $video_id = (int)$video_id;
         if (!$video_id) return new WP_Error('press_vimeo_invalid_id', 'Video ID inválido.');
 
-        // Request the standard Vimeo video payload.
-        return self::api_get('/videos/' . $video_id);
+        // Scope the cache to credentials so replacing a token retries immediately.
+        $key = 'presslms_vimeo_api_' . md5($video_id . ':' . self::get_token());
+        $cached = get_transient($key);
+        if ($cached !== false) return $cached;
+        $data = self::api_get('/videos/' . $video_id);
+        set_transient($key, $data, is_wp_error($data) ? 120 : HOUR_IN_SECONDS);
+        return $data;
+    }
+
+    /** Resolve metadata even when an API token cannot access an embeddable video. */
+    public static function get_video_metadata(string $url)
+    {
+        $id = self::parse_video_id($url);
+        if (!$id) return new WP_Error('press_vimeo_invalid_id', 'URL Vimeo invalida.');
+        $data = self::get_video_data($id);
+        if (is_array($data) && (int) ($data['duration'] ?? 0) > 0) return $data;
+
+        $key = 'presslms_vimeo_oembed_' . md5($url . home_url('/'));
+        $cached = get_transient($key);
+        if ($cached !== false) return $cached;
+
+        // Only Vimeo's fixed endpoint receives the configured URL; never fetch a user-supplied host.
+        $response = wp_safe_remote_get(add_query_arg(['url' => $url, 'format' => 'json'], 'https://vimeo.com/api/oembed.json'), [
+            'timeout' => 10,
+            'headers' => ['Referer' => home_url('/')],
+        ]);
+        $payload = is_wp_error($response) ? null : json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200 &&
+            is_array($payload) && (int) ($payload['video_id'] ?? 0) === $id && (int) ($payload['duration'] ?? 0) > 0) {
+            $data = [
+                'duration' => (int) $payload['duration'],
+                'name' => (string) ($payload['title'] ?? ''),
+                'pictures' => ['sizes' => [['width' => (int) ($payload['thumbnail_width'] ?? 0), 'link' => (string) ($payload['thumbnail_url'] ?? '')]]],
+            ];
+        } else {
+            $data = new WP_Error('press_vimeo_metadata_unavailable', 'Nao foi possivel consultar a duracao. Verifique a privacidade e o dominio de incorporacao no Vimeo.');
+        }
+        set_transient($key, $data, is_wp_error($data) ? 120 : HOUR_IN_SECONDS);
+        return $data;
     }
 
     /**
@@ -162,17 +196,33 @@ class PRESS_LMS_Vimeo
     /**
      * Render the standard Vimeo player iframe wrapper.
      */
-    public static function get_embed_html($video_id, $width = 960)
+    public static function get_embed_html($video_id, $width = 960, string $original_url = '', bool $trailer = false)
     {
         // Use the standard Vimeo player for public, unlisted, or embeddable private videos.
         $video_id = (int)$video_id;
         if (!$video_id) return '';
 
         $src = 'https://player.vimeo.com/video/' . $video_id;
-        $w = (int)$width;
+        $parts = wp_parse_url($original_url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if (in_array($host, ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'], true)) {
+            parse_str((string) ($parts['query'] ?? ''), $query);
+            $hash = is_string($query['h'] ?? null) ? $query['h'] : '';
+            if ($hash === '' && preg_match('~/' . $video_id . '/([a-zA-Z0-9]+)/*$~', (string) ($parts['path'] ?? ''), $matches)) {
+                $hash = $matches[1];
+            }
+            if ($hash !== '' && ctype_alnum($hash)) {
+                $src = add_query_arg('h', $hash, $src);
+            }
+        }
 
-        return '<div class="press-vimeo-embed" style="position:relative;border-radius:12px;overflow:hidden;">
-            <iframe src="' . esc_url($src) . '" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+        $src = add_query_arg('fullscreen', '1', $src);
+        if ($trailer) {
+            // Vimeo honors branding parameters only on eligible owner plans.
+            $src = add_query_arg('vimeo_logo', '0', $src);
+        }
+        return '<div class="press-vimeo-embed" style="position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;">
+            <iframe title="' . ($trailer ? 'Trailer do curso' : 'Video da aula') . '" src="' . esc_url($src) . '" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe>
         </div>';
     }
 

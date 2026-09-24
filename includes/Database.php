@@ -52,9 +52,22 @@ class PRESS_LMS_Database {
             KEY course_user (course_id, user_id)
         ) {$charset};";
 
+        $sql_contato = "CREATE TABLE {$prefix}contato (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            nome VARCHAR(190) NOT NULL,
+            telefone VARCHAR(50) NOT NULL,
+            mensagem LONGTEXT NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'nao_concluido',
+            saved_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            KEY status (status),
+            KEY saved_at (saved_at)
+        ) {$charset};";
+
         dbDelta($sql_students);
         dbDelta($sql_enrollments);
         dbDelta($sql_progress);
+        dbDelta($sql_contato);
     }
 
     public static function table($name) {

@@ -69,3 +69,16 @@
   font-size: 12px;
   opacity: .6;
 }
+/* Keep LMS titles below overlay headers without changing the theme itself. */
+.presslms-theme-main { padding-block-start: var(--presslms-header-offset, 0px); min-width: 0; }
+.presslms .presslms-sample-label {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 9px;
+  border: 1px solid #b6d9c3;
+  border-radius: 6px;
+  background: #edf8f1;
+  color: #165c35;
+  font-size: 12px;
+  font-weight: 700;
+}

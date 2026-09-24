@@ -93,7 +93,7 @@ class PRESS_LMS_Certificate
             return [];
         }
 
-        $course_duration = (int) get_post_meta($course_id, '_press_course_total_duration', true);
+        $course_duration = PRESSLMS_Duration::get_course_total_duration($course_id);
         $description     = (string) get_post_meta($course_id, '_press_course_certificate_description', true);
 
         $logo_id         = (int) get_post_meta($course_id, '_press_course_certificate_logo_id', true);
@@ -241,9 +241,17 @@ class PRESS_LMS_Certificate
         return strtr($html, $map);
     }
 
+    public static function sanitize_css(string $css): string
+    {
+        $css = wp_kses_no_null(str_replace(["\r\n", "\r"], "\n", $css), ['slash_zero' => 'keep']);
+        // CSS escapes cannot terminate the HTML raw-text style element.
+        return trim(str_replace('<', '\\3c ', $css));
+    }
+
     public static function get_certificate_styles(string $css = ''): string
     {
-        $css = trim($css);
+        // Protect existing templates as well as newly saved CSS.
+        $css = self::sanitize_css($css);
 
         if ($css === '') {
             return '';

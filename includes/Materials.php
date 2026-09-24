@@ -2,16 +2,58 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Normalize lesson materials, infer file types, and resolve SVG icons.
+ * Shared course/lesson materials, admin editor and download-list presentation.
  */
 class PRESS_LMS_Materials
 {
-    /**
-     * Reserved for future hooks.
-     */
+    const COURSE_META = '_press_course_materials_v2';
+
     public static function init()
     {
-        // No runtime hooks are required for this helper today.
+        add_action('add_meta_boxes_press_course', [__CLASS__, 'add_course_box']);
+        add_action('save_post_press_course', [__CLASS__, 'save_course'], 10, 2);
+    }
+
+    public static function add_course_box(): void
+    {
+        add_meta_box('press-course-materials', 'Materiais gerais do curso', [__CLASS__, 'render_course_editor'], 'press_course', 'normal', 'default');
+    }
+
+    public static function render_course_editor($post): void
+    {
+        wp_enqueue_media();
+        wp_nonce_field('press_course_materials_save', 'press_course_materials_nonce');
+        echo '<p>Adicione apostilas, arquivos e links extras para todo o curso. Os alunos com acesso encontram estes materiais na pagina do curso e no painel Meus cursos.</p>';
+        PRESS_LMS_Lesson_Meta::render_materials_editor(self::normalize_items(get_post_meta($post->ID, self::COURSE_META, true)));
+        echo '<p class="description">A lista e restrita aos alunos. Arquivos da biblioteca do WordPress e links externos mantem as permissoes do local onde estao hospedados; conhecer a URL direta pode permitir acesso fora do LMS.</p>';
+    }
+
+    public static function save_course($id, $post): void
+    {
+        if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || wp_is_post_revision($id)
+            || !current_user_can('edit_post', $id) || !is_string($_POST['press_course_materials_nonce'] ?? null)
+            || !wp_verify_nonce(wp_unslash($_POST['press_course_materials_nonce']), 'press_course_materials_save')) return;
+        PRESS_LMS_Lesson_Meta::save_submitted_materials((int) $id, self::COURSE_META);
+    }
+
+    public static function get_accessible_course_items(int $course_id): array
+    {
+        if (!PRESS_LMS_Helpers::is_viewable_post(get_post($course_id), 'press_course')
+            || !PRESS_LMS_Enrollments::can_access_course(get_current_user_id(), $course_id)) return [];
+        return self::normalize_items(get_post_meta($course_id, self::COURSE_META, true));
+    }
+
+    public static function render_course_downloads(int $course_id): void
+    {
+        $items = self::get_accessible_course_items($course_id);
+        if (!$items) return;
+        echo '<section class="presslms-card" id="materiais-do-curso"><div class="presslms-card__header"><h2 class="presslms-h2">Materiais do curso</h2></div><ul class="presslms-course-downloads">';
+        foreach ($items as $item) {
+            if ($item['url'] === '') continue;
+            $download = $item['type'] === 'file' ? ' download' : '';
+            echo '<li>' . self::get_icon_img_html($item['kind'], 24) . '<a href="' . esc_url($item['url']) . '" target="_blank" rel="noopener noreferrer"' . $download . '>' . esc_html($item['name'] ?: 'Abrir material') . '</a></li>';
+        }
+        echo '</ul></section>';
     }
 
     /**

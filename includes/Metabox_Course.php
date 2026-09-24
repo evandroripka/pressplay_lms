@@ -95,6 +95,24 @@ class PRESS_LMS_Course_Meta
         ];
     }
 
+    private static function render_readiness_checklist(WP_Post $course): void
+    {
+        $teacher = get_post((int) get_post_meta($course->ID, '_press_course_teacher', true));
+        $product_id = (int) get_post_meta($course->ID, '_press_course_product_id', true);
+        $product = $product_id && function_exists('wc_get_product') ? wc_get_product($product_id) : null;
+        $checks = [
+            'Apresentação do curso' => trim(wp_strip_all_tags($course->post_content)) !== '',
+            'Professor cadastrado' => $teacher instanceof WP_Post && $teacher->post_type === 'press_teacher',
+            'Aulas publicadas' => count(PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish'])) > 0,
+            'Produto com preço configurado' => $product && $product->get_price() !== '',
+        ];
+        echo '<div class="press-course-readiness"><h3>Checklist de publicação</h3><p>Conferência dos dados salvos. Salve as alterações para atualizar esta lista.</p><ul>';
+        foreach ($checks as $label => $ready) {
+            echo '<li><strong>' . ($ready ? 'OK' : 'Revisar') . ':</strong> ' . esc_html($label) . '</li>';
+        }
+        echo '</ul></div>';
+    }
+
     private static function get_default_feature_keys(): array
     {
         $default_keys = [];
@@ -288,13 +306,7 @@ class PRESS_LMS_Course_Meta
 
     private static function sanitize_certificate_css(string $css): string
     {
-        $css = wp_unslash($css);
-        $css = str_replace(["\r\n", "\r"], "\n", $css);
-        $css = wp_kses_no_null($css, ['slash_zero' => 'keep']);
-        $css = str_replace(['<?', '?>'], '', $css);
-        $css = preg_replace('#</style#i', '<\\/style', $css);
-
-        return is_string($css) ? trim($css) : '';
+        return PRESS_LMS_Certificate::sanitize_css(wp_unslash($css));
     }
 
     private static function get_certificate_preview_placeholder_data_uri(
@@ -397,7 +409,8 @@ class PRESS_LMS_Course_Meta
         echo '<table class="widefat striped">';
         echo '<thead>';
         echo '<tr>';
-        echo '<th style="width:80px;">Ordem</th>';
+        echo '<th style="width:60px;">Aula</th>';
+        echo '<th style="width:100px;">Ordem</th>';
         echo '<th>Título</th>';
         echo '<th style="width:120px;">Status</th>';
         echo '<th style="width:180px;">Ações</th>';
@@ -405,12 +418,13 @@ class PRESS_LMS_Course_Meta
         echo '</thead>';
         echo '<tbody>';
 
-        foreach ($lessons as $lesson) {
+        foreach ($lessons as $index => $lesson) {
             $edit_url = get_edit_post_link($lesson->ID);
             $view_url = home_url('/curso/' . $post->post_name . '/aula/' . $lesson->post_name . '/');
 
             echo '<tr>';
-            echo '<td>' . (int) $lesson->menu_order . '</td>';
+            echo '<td><strong>' . esc_html(sprintf('%02d', $index + 1)) . '</strong></td>';
+            echo '<td><input type="number" min="0" max="999999" style="width:80px" name="press_lesson_order[' . (int) $lesson->ID . ']" value="' . (int) $lesson->menu_order . '" aria-label="' . esc_attr('Ordem: ' . $lesson->post_title) . '"></td>';
             echo '<td><strong>' . esc_html($lesson->post_title ?: '(Sem título)') . '</strong></td>';
             echo '<td>' . esc_html($lesson->post_status) . '</td>';
             echo '<td>';
@@ -422,7 +436,21 @@ class PRESS_LMS_Course_Meta
 
         echo '</tbody>';
         echo '</table>';
+        echo '<p class="description">Ordem 0: sequencia de cadastro. Valores maiores que zero aparecem primeiro, em ordem crescente. Salve o curso para aplicar. A coluna Aula mostra a sequencia atual; rascunhos nao aparecem para o aluno.</p>';
         echo '</div>';
+    }
+
+    public static function save_lesson_order(int $course_id, array $orders): void
+    {
+        // Never trust submitted IDs: only editable lessons belonging to this course.
+        if (!current_user_can('edit_post', $course_id)) return;
+        foreach (self::get_course_lessons($course_id) as $lesson) {
+            if (!isset($orders[$lesson->ID]) || !is_scalar($orders[$lesson->ID]) || !current_user_can('edit_post', $lesson->ID)) continue;
+            $order = max(0, min(999999, (int) $orders[$lesson->ID]));
+            if ((int) $lesson->menu_order !== $order) {
+                wp_update_post(['ID' => $lesson->ID, 'menu_order' => $order]);
+            }
+        }
     }
 
     private static function render_features_section($post): void
@@ -795,6 +823,7 @@ class PRESS_LMS_Course_Meta
         </style>';
 
         echo '<div class="press-course-tabs" id="press-course-tabs">';
+        self::render_readiness_checklist($post);
         echo '<div class="press-course-tabs__nav" role="tablist" aria-label="Seções do curso">';
         echo '<button type="button" class="press-course-tabs__btn is-active" data-tab-target="details" role="tab" aria-selected="true">Detalhes</button>';
         echo '<button type="button" class="press-course-tabs__btn" data-tab-target="includes" role="tab" aria-selected="false">Inclui <span class="press-course-tabs__count">' . esc_html($features_count) . '</span></button>';
@@ -848,7 +877,7 @@ class PRESS_LMS_Course_Meta
 
         echo '</p>';
         echo '<hr>';
-        echo '<p style="color:#666">MVP: Galeria de imagens podemos fazer depois (Media Uploader). Primeiro vamos fechar curso/aulas/materiais.</p>';
+        echo '<p class="description">Revise o professor, o produto e as aulas antes de divulgar este curso.</p>';
 
         echo '<p><label for="press_course_teacher"><strong>Professor do curso</strong></label><br>';
         echo '<select name="press_course_teacher" id="press_course_teacher" class="widefat">';
@@ -955,6 +984,7 @@ class PRESS_LMS_Course_Meta
         echo '</div>';
         echo '</div>';
 
+        echo '</div>';
         echo '<div class="press-course-tab" data-tab-panel="lessons">';
         self::render_lessons_section($post);
         echo '</div>';
@@ -1020,7 +1050,7 @@ class PRESS_LMS_Course_Meta
 
                     const value = String(field.value || '').trim();
 
-                    return value !== '' ? value : fallbackValue;
+                    return value;
                 }
 
                 function getCertificateHtmlValue() {
@@ -1136,12 +1166,17 @@ class PRESS_LMS_Course_Meta
                             const isActive = $button.data('tab-target') === tabId;
                             $button.toggleClass('is-active', isActive);
                             $button.attr('aria-selected', isActive ? 'true' : 'false');
+                            $button.attr('tabindex', isActive ? '0' : '-1');
                         });
 
                         $panels.each(function() {
                             const $panel = $(this);
                             $panel.toggleClass('is-active', $panel.data('tab-panel') === tabId);
                         });
+
+                        if (tabId === 'certificate' && certificateCssCodeMirror) {
+                            window.setTimeout(function() { certificateCssCodeMirror.refresh(); }, 0);
+                        }
 
                         if (tabId === 'certificate' && typeof window.tinymce !== 'undefined') {
                             window.setTimeout(function() {
@@ -1158,6 +1193,14 @@ class PRESS_LMS_Course_Meta
 
                     $buttons.on('click', function() {
                         activateTab($(this).data('tab-target'));
+                    });
+                    $buttons.on('keydown', function(event) {
+                        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                        event.preventDefault();
+                        const index = $buttons.index(this);
+                        const next = event.key === 'Home' ? 0 : event.key === 'End' ? $buttons.length - 1
+                            : (index + (event.key === 'ArrowRight' ? 1 : -1) + $buttons.length) % $buttons.length;
+                        $buttons.eq(next).trigger('click').trigger('focus');
                     });
 
                     activateTab('details');
@@ -1299,6 +1342,10 @@ class PRESS_LMS_Course_Meta
         if (wp_is_post_revision($post_id)) return;
         if (!current_user_can('edit_post', $post_id)) return;
 
+        if (isset($_POST['press_lesson_order']) && is_array($_POST['press_lesson_order'])) {
+            self::save_lesson_order((int) $post_id, wp_unslash($_POST['press_lesson_order']));
+        }
+
         if (isset($_POST['press_course_certificate_html'])) {
             update_post_meta(
                 $post_id,
@@ -1311,7 +1358,7 @@ class PRESS_LMS_Course_Meta
             update_post_meta(
                 $post_id,
                 '_press_course_certificate_css',
-                self::sanitize_certificate_css((string) $_POST['press_course_certificate_css'])
+                wp_slash(self::sanitize_certificate_css((string) $_POST['press_course_certificate_css']))
             );
         }
 

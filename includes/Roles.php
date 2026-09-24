@@ -16,6 +16,9 @@ class PRESS_LMS_Roles {
     public static function block_admin_for_students() {
         if (!is_user_logged_in()) return;
         $user = wp_get_current_user();
+        if (user_can($user, 'edit_posts') || user_can($user, 'manage_woocommerce') || user_can($user, 'manage_options')) {
+            return;
+        }
         if (in_array('press_student', (array)$user->roles, true)) {
             global $pagenow;
 

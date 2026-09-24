@@ -347,6 +347,16 @@
     setActiveCssTab($(this).data('presslmsTab'));
   });
 
+  $(document).on('keydown', '.js-presslms-css-tab', function (event) {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(event.key) === -1) return;
+    event.preventDefault();
+    var $tabs = $('.js-presslms-css-tab');
+    var index = $tabs.index(this);
+    var next = event.key === 'Home' ? 0 : event.key === 'End' ? $tabs.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + $tabs.length) % $tabs.length;
+    $tabs.eq(next).trigger('click').trigger('focus');
+  });
+
   $(document).on('click', '.js-presslms-css-copy', async function () {
     var $button = $(this);
     var value = $(this).data('presslmsInsert') || '';

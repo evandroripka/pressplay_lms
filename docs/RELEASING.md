@@ -4,11 +4,16 @@ This file defines the release routine and versioning policy for Pressplay LMS.
 
 ## Current baseline
 
-- Plugin version: `1.0.1`
+- Plugin version: `1.1.0`
 - WordPress tested up to: `6.9.4`
 - WooCommerce tested up to: `10.6.1`
 
 Update these values only after the release candidate has been tested in a real WordPress environment.
+
+The 1.1.0 candidate adds backward-compatible learning and enrollment features,
+so it is a minor release rather than a patch. Automated regression evidence is in
+[QA Results and Release Gates](QA.md). Do not tag it as a fully accepted sales
+release until the sandbox payment and lifecycle database checklist is complete.
 
 ## Versioning policy
 
@@ -57,6 +62,7 @@ If the project is tagged in Git:
 ## Release checklist
 
 1. Run PHP lint on the changed files.
+   Run the isolated, video-progress, learning-commerce, manual-enrollment and staging runtime/browser suites documented in `QA.md`.
 2. Test activation and route resolution.
 3. Test a WooCommerce checkout with at least one supported gateway.
 4. Confirm enrollment activation after payment.

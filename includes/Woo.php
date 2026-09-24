@@ -19,6 +19,7 @@ class PRESS_LMS_Woo
         add_action('woocommerce_add_to_cart', [__CLASS__, 'handle_add_to_cart'], 10, 6);
         // Ensure pending enrollments also exist when the order is created at checkout.
         add_action('woocommerce_checkout_order_processed', [__CLASS__, 'handle_order_processed'], 10, 3);
+        add_action('woocommerce_store_api_checkout_order_processed', [__CLASS__, 'handle_store_api_order_processed']);
         // React to payment confirmation through the official WooCommerce payment lifecycle.
         add_action('woocommerce_payment_complete', [__CLASS__, 'handle_payment_complete'], 10, 2);
         add_action('woocommerce_order_status_changed', [__CLASS__, 'handle_order_status_changed'], 10, 4);
@@ -28,6 +29,8 @@ class PRESS_LMS_Woo
         add_action('woocommerce_before_calculate_totals', [__CLASS__, 'normalize_course_cart_quantities'], 20, 1);
         add_filter('woocommerce_loop_add_to_cart_link', [__CLASS__, 'filter_loop_add_to_cart_link'], 10, 3);
         add_filter('woocommerce_account_menu_items', [__CLASS__, 'filter_account_menu_items']);
+        add_filter('woocommerce_checkout_registration_required', [__CLASS__, 'require_course_account']);
+        add_filter('woocommerce_checkout_registration_enabled', [__CLASS__, 'require_course_account']);
         add_filter('woocommerce_get_endpoint_url', [__CLASS__, 'filter_account_endpoint_url'], 10, 4);
         add_action('woocommerce_account_' . self::ACCOUNT_ENDPOINT . '_endpoint', [__CLASS__, 'render_student_account_endpoint']);
         add_action('wp', [__CLASS__, 'maybe_swap_single_product_button']);
@@ -40,6 +43,18 @@ class PRESS_LMS_Woo
         }
 
         add_rewrite_endpoint(self::ACCOUNT_ENDPOINT, EP_ROOT | EP_PAGES);
+    }
+
+    public static function require_course_account($required): bool
+    {
+        if (function_exists('WC') && WC()->cart) {
+            foreach (WC()->cart->get_cart() as $item) {
+                if (self::get_course_id_from_product_id((int) ($item['product_id'] ?? 0)) > 0) {
+                    return true;
+                }
+            }
+        }
+        return (bool) $required;
     }
 
     private static function get_student_profile_url(): string
@@ -128,6 +143,16 @@ class PRESS_LMS_Woo
     }
 
     /**
+     * Checkout Blocks use the Store API instead of the classic checkout action.
+     */
+    public static function handle_store_api_order_processed($order): void
+    {
+        if ($order instanceof WC_Order) {
+            self::handle_order_processed($order->get_id(), [], $order);
+        }
+    }
+
+    /**
      * Activate enrollments when WooCommerce confirms payment explicitly.
      */
     public static function handle_payment_complete($order_id, $transaction_id = ''): void
@@ -182,10 +207,15 @@ class PRESS_LMS_Woo
      */
     private static function activate_order_enrollments(WC_Order $order): void
     {
+        if (!$order->is_paid()) {
+            return;
+        }
+
         $user_id = self::get_order_user_id($order);
         if ($user_id <= 0) return;
 
         $provider = self::get_order_payment_provider($order);
+        $granted = array_map('intval', (array) $order->get_meta('_press_lms_granted_courses', true));
 
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
@@ -194,11 +224,13 @@ class PRESS_LMS_Woo
             $product_id = (int) $product->get_id();
             $course_id = self::get_course_id_from_product_id($product_id);
 
-            if ($course_id > 0) {
-                if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
-                    continue;
+            if ($course_id > 0 && !in_array($course_id, $granted, true)) {
+                // Pausing new sales must not prevent fulfilling an already paid order.
+                if (PRESS_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int) $order->get_id(), $provider)) {
+                    $granted[] = $course_id;
+                    $order->update_meta_data('_press_lms_granted_courses', array_values(array_unique($granted)));
+                    $order->save_meta_data();
                 }
-                PRESS_LMS_Enrollments::activate_enrollment($user_id, $course_id, (int) $order->get_id(), $provider);
             }
         }
     }
@@ -312,7 +344,7 @@ class PRESS_LMS_Woo
     /**
      * Resolve the course linked to a WooCommerce product.
      */
-    private static function get_course_id_from_product_id(int $product_id): int
+    public static function get_course_id_from_product_id(int $product_id): int
     {
         if ($product_id <= 0) return 0;
 
@@ -485,6 +517,11 @@ class PRESS_LMS_Woo
             return $is_purchasable;
         }
 
+        $course = get_post($course_id);
+        if (!$course instanceof WP_Post || $course->post_status !== 'publish') {
+            return false;
+        }
+
         if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
             return false;
         }
@@ -503,7 +540,7 @@ class PRESS_LMS_Woo
             : $sold_individually;
     }
 
-    public static function validate_add_to_cart($passed, $product_id, $quantity, $variation_id, $variations, $cart_item_data)
+    public static function validate_add_to_cart($passed, $product_id, $quantity, $variation_id = 0, $variations = [], $cart_item_data = [])
     {
         $course_id = self::get_course_id_from_product_id((int) $product_id);
         if ($course_id <= 0) {

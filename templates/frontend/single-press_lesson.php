@@ -21,7 +21,7 @@ if (class_exists('PRESS_LMS_Materials')) {
 $course_thumbnail_url = get_the_post_thumbnail_url($course->ID, 'medium_large') ?: '';
 // Read the stored lesson duration from post meta.
 $lesson_duration = (int) get_post_meta($lesson->ID, '_press_lesson_duration', true);
-$course_duration = (int) get_post_meta($course->ID, '_press_course_total_duration', true);
+$course_duration = PRESSLMS_Duration::get_course_total_duration((int) $course->ID);
 $course_url = home_url('/curso/' . $course_slug . '/');
 $product_id = class_exists('PRESS_LMS_Enrollments')
   ? PRESS_LMS_Enrollments::get_course_product_id((int) $course->ID)
@@ -33,9 +33,14 @@ $is_paused = class_exists('PRESS_LMS_Enrollments')
   ? PRESS_LMS_Enrollments::is_course_paused((int) $course->ID)
   : false;
 $can_start_enrollment = !$can_access_course && !$is_paused && $product_id > 0;
+if (!$can_access_course) $materials_items = [];
 
 $lessons_list = PRESS_LMS_Helpers::get_course_lessons((int) $course->ID, ['publish']);
 $current_lesson_number = 0;
+$lesson_progress = $can_access_course ? PRESS_LMS_Progress::get_lesson_progress(get_current_user_id(), (int) $lesson->ID) : null;
+$course_summary = $can_access_course ? PRESS_LMS_Progress::get_course_progress_summary(get_current_user_id(), (int) $course->ID) : ['percent'=>0];
+$course_progress = $course_summary['percent'];
+$watch_state = $can_access_course ? PRESS_LMS_Progress::get_watch_state(get_current_user_id(), (int) $lesson->ID) : [];
 
 foreach ($lessons_list as $index => $listed_lesson) {
   if ((int) $listed_lesson->ID === (int) $lesson->ID) {
@@ -112,11 +117,11 @@ if (!function_exists('presslms_format_seconds')) {
           <div class="presslms-meta">
             <span class="presslms-chip">
               <i class="fa-light fa-clock"></i>
-              <b><?php echo esc_html(presslms_format_seconds($course_duration)); ?></b> total
+              <b id="presslms-course-duration"><?php echo $course_duration > 0 ? esc_html(presslms_format_seconds($course_duration)) : 'Aguardando duracao'; ?></b> total
             </span>
             <span class="presslms-chip">
               <i class="fa-light fa-circle-play"></i>
-              Aula: <b><?php echo esc_html(presslms_format_seconds($lesson_duration)); ?></b>
+              Aula: <b id="presslms-lesson-duration"><?php echo $lesson_duration > 0 ? esc_html(presslms_format_seconds($lesson_duration)) : 'Carregando...'; ?></b>
             </span>
           </div>
           <nav class="presslms-breadcrumbs presslms-breadcrumbs--compact" aria-label="Breadcrumb">
@@ -152,13 +157,14 @@ if (!function_exists('presslms_format_seconds')) {
     </header>
     <div class="presslms-layout">
       <main class="presslms-main">
+        <?php if ($vimeo_id || $video_url): ?>
         <section class="presslms-card presslms-player">
           <div class="presslms-player__ratio">
             <?php
             $rendered_video = false;
 
             if ($vimeo_id && class_exists('PRESS_LMS_Vimeo')) {
-              $html = PRESS_LMS_Vimeo::get_embed_html($vimeo_id);
+              $html = PRESS_LMS_Vimeo::get_embed_html($vimeo_id, 960, $video_url);
               if ($html) {
                 echo $html;
                 $rendered_video = true;
@@ -177,6 +183,28 @@ if (!function_exists('presslms_format_seconds')) {
             ?>
           </div>
         </section>
+        <?php endif; ?>
+        <section class="presslms-card presslms-learning-controls" aria-label="Progresso e navegação">
+          <?php if ($can_access_course): ?>
+          <p>Progresso do curso: <strong id="presslms-course-progress"><?php echo esc_html((string) $course_progress); ?>%</strong></p>
+          <progress id="presslms-course-progress-bar" class="presslms-learning-progress" max="100" value="<?php echo esc_attr((string) $course_progress); ?>" aria-label="Percentual assistido do curso"></progress>
+          <button type="button" class="presslms-btn presslms-btn--primary" id="presslms-complete-lesson" <?php disabled(!empty($lesson_progress->completed)); ?>>
+            <?php echo !empty($lesson_progress->completed) ? 'Aula concluída' : 'Marcar aula como concluída'; ?>
+          </button>
+          <p id="presslms-progress-status" class="presslms-muted" role="status" aria-live="polite"></p>
+          <?php else: ?>
+            <span class="presslms-sample-label">Aula grátis</span>
+            <p>Esta é uma amostra gratuita. Matricule-se para acessar o curso completo, os materiais e salvar seu progresso.</p>
+          <?php endif; ?>
+          <nav class="presslms-learning-nav" aria-label="Navegar pelas aulas">
+            <?php foreach ([-1 => 'Aula anterior', 1 => 'Próxima aula'] as $offset => $label):
+              $adjacent = $current_lesson_number > 0 ? ($lessons_list[$current_lesson_number - 1 + $offset] ?? null) : null;
+              if (!$adjacent instanceof WP_Post) continue;
+            ?>
+              <a class="presslms-btn" href="<?php echo esc_url(home_url('/curso/' . $course_slug . '/aula/' . $adjacent->post_name . '/')); ?>"><?php echo esc_html($label); ?></a>
+            <?php endforeach; ?>
+          </nav>
+        </section>
         <section class="presslms-card">
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
@@ -185,7 +213,7 @@ if (!function_exists('presslms_format_seconds')) {
             </h2>
           </div>
           <div class="presslms-content">
-            <?php echo apply_filters('the_content', $lesson->post_content); ?>
+            <?php echo PRESS_LMS_Helpers::render_post_content($lesson); ?>
           </div>
         </section>
         <section class="presslms-card">
@@ -289,7 +317,9 @@ if (!function_exists('presslms_format_seconds')) {
               Materiais
             </h2>
           </div>
-          <?php if (!$materials_items || count($materials_items) === 0): ?>
+          <?php if (!$can_access_course): ?>
+            <p class="presslms-muted">Materiais disponíveis para alunos matriculados.</p>
+          <?php elseif (!$materials_items || count($materials_items) === 0): ?>
             <p class="presslms-muted">Sem materiais nesta aula.</p>
           <?php else: ?>
             <ul class="presslms-materials">
@@ -354,6 +384,7 @@ if (!function_exists('presslms_format_seconds')) {
                   </span>
                   <span class="presslms-lessons__body">
                     <span class="presslms-lessons__title"><?php echo esc_html($l->post_title); ?></span>
+                    <?php if (PRESS_LMS_Helpers::is_sample_lesson((int) $l->ID, (int) $course->ID)): ?><span class="presslms-sample-label">Aula grátis</span><?php endif; ?>
                     <?php if ($sidebar_duration > 0): ?>
                       <span class="presslms-lessons__meta"><?php echo esc_html(presslms_format_seconds($sidebar_duration)); ?></span>
                     <?php endif; ?>
@@ -367,19 +398,10 @@ if (!function_exists('presslms_format_seconds')) {
           <div class="presslms-card__header">
             <h2 class="presslms-h2">
               <i class="fa-light fa-sparkles"></i>
-              Cursos Relacionados
+              Mais cursos
             </h2>
           </div>
-          <div class="presslms-related">
-            <article class="presslms-related__item">
-              <div class="presslms-thumb" aria-hidden="true"></div>
-              <div class="presslms-related__info">
-                <div class="presslms-strong">[Curso 1]</div>
-                <div class="presslms-muted">R$ 99,90</div>
-              </div>
-              <a class="presslms-btn presslms-btn--ghost" href="#"><i class="fa-light fa-bag-shopping"></i></a>
-            </article>
-          </div>
+          <a class="presslms-btn" href="<?php echo esc_url(home_url('/cursos/')); ?>">Explorar catálogo</a>
         </section>
       </aside>
     </div>
@@ -397,12 +419,23 @@ if (!function_exists('presslms_format_seconds')) {
     <?php echo wp_nonce_field('press_lms_enroll_' . $course->ID, '_wpnonce', true, false); ?>
   </form>
 <?php endif; ?>
+<?php if ($can_access_course): ?>
 <script>
 window.presslmsLessonData = {
   ajaxUrl: "<?php echo esc_js(admin_url('admin-ajax.php')); ?>",
   nonce: "<?php echo esc_js(wp_create_nonce('presslms_track_progress')); ?>",
   courseId: <?php echo (int) $course->ID; ?>,
   lessonId: <?php echo (int) $lesson->ID; ?>,
-  vimeoId: <?php echo (int) $vimeo_id; ?>
+  vimeoId: <?php echo (int) $vimeo_id; ?>,
+  watchedSeconds: <?php echo (int) ($lesson_progress->watched_seconds ?? 0); ?>,
+  resumePosition: <?php echo (float) ($watch_state['position'] ?? $lesson_progress->watched_seconds ?? 0); ?>,
+  playedRanges: <?php echo wp_json_encode($watch_state['ranges'] ?? []); ?>,
+  lessonDuration: <?php echo (int) $lesson_duration; ?>,
+  courseDuration: <?php echo (int) $course_duration; ?>,
+  durationComplete: <?php echo $course_summary['duration_complete'] ? 'true' : 'false'; ?>,
+  coursePercent: <?php echo (float) $course_progress; ?>,
+  otherWatchedSeconds: <?php echo max(0, $course_summary['watched_seconds'] - (!empty($lesson_progress->completed) ? $lesson_duration : min($lesson_duration, (int) ($lesson_progress->watched_seconds ?? 0)))); ?>,
+  completed: <?php echo !empty($lesson_progress->completed) ? 'true' : 'false'; ?>
 };
 </script>
+<?php endif; ?>

@@ -1,7 +1,7 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-status_header(200);
+status_header(PRESS_LMS_Frontend::get_route_status());
 nocache_headers();
 
 get_header();

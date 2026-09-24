@@ -36,6 +36,13 @@
   border-bottom: 1px solid var(--pl-border);
 }
 
+.presslms-course-side__cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
 .presslms-course-side__placeholder {
   height: 240px;
   display: grid;
@@ -252,3 +259,10 @@
     font-size: 11px;
   }
 }
+/* The price follows WooCommerce formatting, currency and sale-price rules. */
+.presslms-course-price { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; }
+.presslms-course-price del { font-size: 1rem; opacity: .7; }
+.presslms-course-downloads { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.presslms-course-downloads li { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--pl-border, #d9dfe7); border-radius: 8px; }
+.presslms-course-downloads a { overflow-wrap: anywhere; min-width: 0; }
+#materiais-do-curso { scroll-margin-top: 180px; }

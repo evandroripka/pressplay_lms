@@ -1,6 +1,6 @@
 # Payment Compatibility
 
-Last reviewed: 2026-03-22
+Last reviewed: 2026-09-24
 
 This note explains how Pressplay LMS stays compatible with the broader WooCommerce payment ecosystem without coupling the plugin to one specific gateway.
 
@@ -11,6 +11,7 @@ Pressplay LMS treats WooCommerce as the source of truth for payment state.
 Instead of listening for gateway-specific callbacks from PayPal, Mercado Pago, PagBank/PagSeguro, or another single provider, the LMS reacts to the order lifecycle that WooCommerce exposes:
 
 - `woocommerce_checkout_order_processed`
+- `woocommerce_store_api_checkout_order_processed` (Checkout Blocks)
 - `woocommerce_payment_complete`
 - `woocommerce_order_status_changed`
 - `wc_get_is_paid_statuses()`
@@ -27,6 +28,12 @@ This makes the plugin compatible with gateways that integrate correctly with Woo
    - `failed`
    - `refunded`
 5. Stores the actual WooCommerce payment method ID on the enrollment when available.
+6. Records fulfilled course IDs using WooCommerce order CRUD to ignore repeated sequential payment events.
+7. Preserves manual access blocks and allows a previously unpaid failed/cancelled order to be fulfilled after a successful payment retry.
+
+Activation also checks `$order->is_paid()`. A payment hook invoked for an unpaid
+order is not sufficient to grant access. Read [QA.md](QA.md) for tested scenarios,
+disabled-gateway findings and the remaining sandbox/concurrency acceptance gates.
 
 ## Why this is more universal
 

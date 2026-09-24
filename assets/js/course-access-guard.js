@@ -44,6 +44,7 @@
     var lessons = root.querySelectorAll('[data-presslms-lesson-link="1"]');
 
     lessons.forEach(function (lessonLink) {
+      if (lessonLink.getAttribute('data-free-preview') === '1') return;
       lessonLink.addEventListener('click', function (event) {
         event.preventDefault();
 

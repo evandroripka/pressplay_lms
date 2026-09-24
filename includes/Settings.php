@@ -798,6 +798,10 @@ class PRESS_LMS_Settings
                 'type' => 'warning',
                 'message' => 'O acesso da matrícula foi bloqueado.',
             ],
+            'manual_access_granted' => [
+                'type' => 'success',
+                'message' => 'Acesso manual liberado. O usuario ja pode acessar Meus cursos com sua conta atual.',
+            ],
             'enrollment_reactivated' => [
                 'type' => 'success',
                 'message' => 'A matrícula foi reativada com sucesso.',
@@ -1079,12 +1083,7 @@ class PRESS_LMS_Settings
 
         switch ($action_type) {
             case 'block':
-                $updated = PRESS_LMS_Enrollments::deactivate_enrollment(
-                    (int) $enrollment->user_id,
-                    (int) $enrollment->course_id,
-                    'blocked',
-                    (int) ($enrollment->order_ref ?? 0)
-                );
+                $updated = PRESS_LMS_Enrollments::block_enrollment_by_id($enrollment_id);
                 $notice = $updated ? 'enrollment_blocked' : 'enrollment_update_failed';
                 break;
 

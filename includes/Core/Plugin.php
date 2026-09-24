@@ -50,7 +50,10 @@ class PRESS_LMS_Plugin
         PRESSLMS_Teacher_CPT::init();
         PRESS_LMS_Course_Meta::init();
         PRESS_LMS_Lesson_Meta::init();
+        PRESS_LMS_Materials::init();
         PRESS_LMS_Woo::init();
+        PRESS_LMS_Terms::init();
+        PRESS_LMS_Manual_Enrollments::init();
         PRESS_LMS_Templates::init();
         PRESS_LMS_Actions::init();
         PRESS_LMS_Course_Lifecycle::init();
@@ -123,6 +126,12 @@ class PRESS_LMS_Plugin
 
     public static function enqueue_app_assets(): void
     {
+        $post = get_post();
+        if (!PRESS_LMS_Frontend::is_theme_compat_request() &&
+            !($post instanceof WP_Post && has_shortcode($post->post_content, 'press_register'))) {
+            return;
+        }
+
         wp_enqueue_style('press-lms-app', PRESS_LMS_URL . 'assets/css/app.css', [], PRESS_LMS_VERSION);
     }
 }

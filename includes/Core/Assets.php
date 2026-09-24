@@ -24,6 +24,9 @@ class PRESSLMS_Assets
 
   public static function enqueue_frontend(): void
   {
+    if (self::get_frontend_route_type() !== '') {
+      wp_enqueue_script('presslms-theme-layout', PRESS_LMS_URL . 'assets/js/theme-layout.js', [], PRESS_LMS_VERSION, true);
+    }
     if (self::is_register_route()) {
       self::enqueue_register_assets();
       return;
@@ -124,9 +127,9 @@ class PRESSLMS_Assets
 
   private static function enqueue_register_assets(): void
   {
-    if (wp_style_is('press-lms-app', 'enqueued')) {
-      self::append_custom_css('press-lms-app');
-    }
+    // This callback runs before the shared app styles callback at the same priority.
+    wp_enqueue_style('press-lms-app', PRESS_LMS_URL . 'assets/css/app.css', [], PRESS_LMS_VERSION);
+    self::append_custom_css('press-lms-app');
   }
 
   private static function enqueue_course_assets(): void

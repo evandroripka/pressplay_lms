@@ -5,7 +5,7 @@ Requires at least: 6.0
 Tested up to: 6.9.4
 Requires PHP: 8.0
 Requires Plugins: woocommerce
-Stable tag: 1.0.1
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,7 +21,11 @@ Main capabilities:
 * protected lesson access
 * custom student dashboard and account routes
 * lesson progress tracking
-* certificate generation based on real completion
+* certificate generation based on recorded learner completion
+* free lesson samples and course-wide learning materials
+* time-weighted Vimeo progress with playback resume
+* per-course purchase terms with versioned acceptance records
+* manual timed or unlimited access without changing WordPress roles
 * enrollment lifecycle management for support and operations
 * theme-compatible frontend rendering
 
@@ -54,6 +58,41 @@ The plugin is designed to be gateway-agnostic and relies on the standard WooComm
 Yes. The plugin includes custom routes for catalog, course pages, lessons, student dashboard, profile, password management, and certificates.
 
 == Changelog ==
+
+= 1.1.0 =
+
+* Added published lesson samples without login or enrollment, with free-lesson labels.
+* Added editable curriculum positions, sequential numbering and registration-order fallback.
+* Added general course materials using the same file/link editor as individual lessons.
+* Added per-course contract editor, affirmative checkout acceptance and versioned order snapshots.
+* Validated contracts for classic checkout, Checkout Blocks and order-payment retries.
+* Enabled native trailer fullscreen controls, without an external expansion button, and requested optional Vimeo logo hiding on eligible plans.
+* Added manual timed or unlimited enrollments for existing WordPress users, preserving roles and profile information.
+* Recorded manual grant history, made notification email opt-in and kept courtesy access separate from paid orders.
+* Scoped admin blocking to the selected enrollment and deduplicated dashboard course cards.
+
+= 1.0.3 =
+
+* Recovered Vimeo durations through official oEmbed when the configured API token cannot access an embeddable video.
+* Recalculated course duration from published lessons and preserved verified durations during API outages.
+* Weighted course progress by watched duration, with decimal percentages and a live progress bar.
+* Saved unique played intervals, resumed playback separately and avoided counting seeks or repeated playback twice.
+* Added periodic, pause, visibility and page-exit progress persistence with retry handling.
+
+= 1.0.2 =
+
+* Fixed cart validation, guest checkout continuity and cart preservation.
+* Hardened certificate CSS and unpublished content access.
+* Preserved staff roles and prevented repeated order notifications from renewing access.
+* Fulfilled paid orders even when new course sales are paused.
+* Fixed course editor tabs and added keyboard navigation and a publication checklist.
+* Added manual lesson completion fallback, progress retries and Vimeo resume support.
+* Corrected course route context, missing-page status and local icon packaging.
+* Added isolated, WordPress integration and browser regression tests.
+* Preserved store-wide account settings on activation and retained configuration when uninstall data deletion is disabled.
+* Supported pending enrollment creation from Checkout Blocks and recovery of previously unpaid orders.
+* Reduced unrelated-page CSS loading and unnecessary lesson taxonomy cache work.
+* Improved overlay-header spacing, course pricing and incomplete-course presentation.
 
 = 1.0.1 =
 

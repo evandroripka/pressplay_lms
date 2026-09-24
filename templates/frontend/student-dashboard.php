@@ -181,7 +181,7 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
 
                 <div class="presslms-student-progress">
                   <div class="presslms-student-progress__track">
-                    <span class="presslms-student-progress__bar" style="width: <?php echo esc_attr((string) max(0, min(100, (int) $course['progress_percent']))); ?>%;"></span>
+                    <span class="presslms-student-progress__bar" style="width: <?php echo esc_attr((string) max(0, min(100, (float) $course['progress_percent']))); ?>%;"></span>
                   </div>
                   <div class="presslms-student-progress__legend">
                     <span><?php echo esc_html((string) $course['completed_lessons']); ?> de <?php echo esc_html((string) $course['total_lessons']); ?> aulas concluídas</span>
@@ -198,6 +198,9 @@ $registered_at = (string) ($profile['registered_at'] ?? '');
                     <i class="fa-light fa-arrow-up-right-from-square"></i>
                     Ver curso
                   </a>
+                  <?php if (PRESS_LMS_Materials::get_accessible_course_items((int) $course['course_id'])): ?>
+                    <a class="presslms-btn" href="<?php echo esc_url($course['course_url'] . '#materiais-do-curso'); ?>">Materiais do curso</a>
+                  <?php endif; ?>
                   <?php if (!empty($course['certificate_available']) && !empty($course['certificate_url'])): ?>
                     <a class="presslms-btn" href="<?php echo esc_url((string) $course['certificate_url']); ?>" target="_blank" rel="noopener noreferrer">
                       <i class="fa-light fa-certificate"></i>

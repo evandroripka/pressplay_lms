@@ -342,6 +342,8 @@ class PRESS_LMS_Enrollments
                 WHEN e.status = 'pending' THEN 1
                 ELSE 2
             END,
+            CASE WHEN e.status = 'active' AND e.expires_at IS NULL THEN 0 ELSE 1 END,
+            e.expires_at DESC,
             COALESCE(e.purchased_at, e.created_at) DESC,
             e.id DESC
         ";
@@ -426,6 +428,11 @@ class PRESS_LMS_Enrollments
             return false;
         }
 
+        // An order update must not replace a support team's manual access block.
+        if ($order_id > 0 && $enrollment->status === 'blocked') {
+            return false;
+        }
+
         $result = $wpdb->update(
             $table,
             [
@@ -473,6 +480,13 @@ class PRESS_LMS_Enrollments
         }
 
         return $result !== false;
+    }
+
+    public static function block_enrollment_by_id(int $enrollment_id): bool
+    {
+        global $wpdb;
+        if ($enrollment_id <= 0 || !self::get_enrollment_by_id($enrollment_id)) return false;
+        return $wpdb->update(PRESS_LMS_Database::table('enrollments'), ['status'=>'blocked','updated_at'=>current_time('mysql')], ['id'=>$enrollment_id]) !== false;
     }
 
     public static function extend_enrollment_by_id(int $enrollment_id, int $amount, string $unit = 'days'): bool
@@ -586,6 +600,9 @@ class PRESS_LMS_Enrollments
             return 0;
         }
 
+        if ($user_id <= 0 || $course_id <= 0) {
+            return 0;
+        }
         self::ensure_student_role($user_id);
         $table = PRESS_LMS_Database::table('enrollments');
         $now = current_time('mysql');
@@ -613,7 +630,7 @@ class PRESS_LMS_Enrollments
         }
 
         // Create a fresh pending enrollment.
-        $wpdb->insert($table, [
+        $result = $wpdb->insert($table, [
             'user_id' => $user_id,
             'course_id' => $course_id,
             'status' => 'pending',
@@ -625,7 +642,7 @@ class PRESS_LMS_Enrollments
             'updated_at' => $now,
         ]);
 
-        return (int)$wpdb->insert_id;
+        return $result === false ? 0 : (int) $wpdb->insert_id;
     }
     public static function ensure_student_role(int $user_id): void
     {
@@ -642,14 +659,16 @@ class PRESS_LMS_Enrollments
             return;
         }
 
-        // Make the student role the primary role for LMS users.
-        $user->set_role('press_student');
+        // Learning access must never replace a staff member's existing capabilities.
+        $user->add_role('press_student');
     }
     public static function activate_enrollment(int $user_id, int $course_id, int $order_id, string $provider = 'woocommerce'): bool
     {
         global $wpdb;
 
-        self::ensure_student_role($user_id);
+        if ($user_id <= 0 || $course_id <= 0 || $order_id <= 0) {
+            return false;
+        }
 
         $table = PRESS_LMS_Database::table('enrollments');
 
@@ -658,16 +677,19 @@ class PRESS_LMS_Enrollments
         $expires = self::calculate_enrollment_expiration($course_id, $now_ts);
 
         // Update the existing enrollment or create a new one if needed.
-        $sql = "SELECT id FROM {$table} WHERE user_id=%d AND course_id=%d LIMIT 1";
-        $id = $wpdb->get_var($wpdb->prepare($sql, $user_id, $course_id));
+        $sql = "SELECT id FROM {$table} WHERE user_id=%d AND course_id=%d
+                AND (payment_provider IS NULL OR payment_provider <> 'manual' OR status = 'blocked')
+                ORDER BY (status = 'blocked') DESC, (order_ref = %s) DESC, id DESC LIMIT 1";
+        $id = $wpdb->get_var($wpdb->prepare($sql, $user_id, $course_id, (string) $order_id));
 
         if ($id) {
             $existing = self::get_enrollment_by_id((int) $id);
             if (
                 $existing &&
-                $existing->status === 'active' &&
-                (string) ($existing->order_ref ?? '') === (string) $order_id &&
-                !self::is_expired_at((string) ($existing->expires_at ?? ''))
+                ($existing->status === 'blocked' ||
+                    ((string) ($existing->order_ref ?? '') === (string) $order_id &&
+                        (!empty($existing->purchased_at) ||
+                            !in_array($existing->status, ['pending', 'failed', 'cancelled'], true))))
             ) {
                 return false;
             }
@@ -696,6 +718,8 @@ class PRESS_LMS_Enrollments
         if ($result === false) {
             return false;
         }
+
+        self::ensure_student_role($user_id);
 
         if (class_exists('PRESS_LMS_Mailer')) {
             $enrollment = $enrollment_id > 0 ? self::get_enrollment_by_id($enrollment_id) : null;

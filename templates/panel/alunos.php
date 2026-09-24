@@ -65,6 +65,8 @@ if (!function_exists('presslms_admin_student_initials')) {
         <?php endif; ?>
         </div>
 
+        <?php PRESS_LMS_Manual_Enrollments::render($courses); ?>
+
         <div class="presslms-admin-card presslms-admin-card--filters">
             <form method="get" class="presslms-filters-form">
                 <input type="hidden" name="page" value="<?php echo esc_attr($panel_page_slug); ?>">
@@ -190,6 +192,9 @@ if (!function_exists('presslms_admin_student_initials')) {
                                     add_query_arg($action_base_args + ['enrollment_action' => 'reactivate'], admin_url('admin-post.php')),
                                     $manage_nonce
                                 );
+                                if (($student->payment_provider ?? '') === 'manual') {
+                                    $reactivate_url = add_query_arg(['page'=>'press-lms','manual_user_search'=>$student->user_email], admin_url('admin.php')) . '#presslms-manual-access';
+                                }
                                 $extend_30_url = wp_nonce_url(
                                     add_query_arg($action_base_args + ['enrollment_action' => 'extend_30_days'], admin_url('admin-post.php')),
                                     $manage_nonce
@@ -242,7 +247,9 @@ if (!function_exists('presslms_admin_student_initials')) {
                                     </td>
 
                                     <td>
-                                        <?php if (!empty($student->order_ref)): ?>
+                                        <?php if (($student->payment_provider ?? '') === 'manual'): ?>
+                                            Acesso manual
+                                        <?php elseif (!empty($student->order_ref)): ?>
                                             #<?php echo esc_html($student->order_ref); ?>
                                         <?php else: ?>
                                             —

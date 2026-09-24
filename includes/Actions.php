@@ -18,93 +18,7 @@ class PRESS_LMS_Actions
         add_filter('woocommerce_registration_redirect', [__CLASS__, 'woo_registration_redirect'], 10, 1);
         add_filter('login_redirect', [__CLASS__, 'default_login_redirect'], 10, 3);
         add_action('wp_ajax_press_lms_change_student_password', [__CLASS__, 'ajax_change_student_password']);
-        add_action('save_post_press_lesson', function ($post_id, $post, $update) {
-
-            // Ignore autosaves, revisions, and invalid post objects.
-            if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) return;
-            if (!$post || !($post instanceof WP_Post)) return;
-
-            $post_id = (int) $post_id;
-
-            // Refresh lesson metadata only for published lessons.
-            if ($post->post_status !== 'publish') return;
-
-            // Rate-limit the Vimeo sync to avoid burst saves or loops.
-            $rate_key = 'presslms_vimeo_duration_lock_' . $post_id;
-            if (get_transient($rate_key)) {
-                // Still recalculate course totals even when the API sync is skipped.
-                $course_id = (int) get_post_meta($post_id, '_press_lesson_course_id', true);
-                if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
-                    PRESSLMS_Duration::recalc_course_total_duration($course_id);
-                }
-                return;
-            }
-            set_transient($rate_key, 1, 30); // 30-second cooldown.
-
-            // Resolve the linked course.
-            $course_id = (int) get_post_meta($post_id, '_press_lesson_course_id', true);
-
-            // Read the current Vimeo metadata cache.
-            $vimeo_id = (int) get_post_meta($post_id, '_press_lesson_vimeo_id', true);
-
-            $cached_vimeo_id   = (int) get_post_meta($post_id, '_press_lesson_vimeo_id_cached', true);
-            $cached_modified   = (string) get_post_meta($post_id, '_press_lesson_vimeo_modified_cached', true);
-            $current_duration  = (int) get_post_meta($post_id, '_press_lesson_duration', true);
-
-            // Reset duration data when the lesson no longer points to Vimeo.
-            if ($vimeo_id <= 0) {
-                update_post_meta($post_id, '_press_lesson_duration', 0);
-                update_post_meta($post_id, '_press_lesson_vimeo_id_cached', 0);
-                update_post_meta($post_id, '_press_lesson_vimeo_modified_cached', '');
-
-                if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
-                    PRESSLMS_Duration::recalc_course_total_duration($course_id);
-                }
-                return;
-            }
-
-            // Decide whether the remote Vimeo payload needs to be refreshed.
-            $need_refresh = false;
-
-            if ($cached_vimeo_id !== $vimeo_id) $need_refresh = true;
-
-            if ($current_duration <= 0) $need_refresh = true;
-
-            // Use modified_time when a token is available to invalidate caches safely.
-            if (!$need_refresh && class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'has_token') && PRESS_LMS_Vimeo::has_token()) {
-                if (method_exists('PRESS_LMS_Vimeo', 'get_video_modified_time')) {
-                    $remote_modified = PRESS_LMS_Vimeo::get_video_modified_time($vimeo_id);
-                    if ($remote_modified && $remote_modified !== $cached_modified) {
-                        $need_refresh = true;
-                    }
-                }
-            }
-
-            // Refresh duration and remote metadata through the Vimeo API.
-            if ($need_refresh && class_exists('PRESS_LMS_Vimeo') && method_exists('PRESS_LMS_Vimeo', 'has_token') && PRESS_LMS_Vimeo::has_token()) {
-
-                $duration = 0;
-                $remote_modified = '';
-
-                if (method_exists('PRESS_LMS_Vimeo', 'get_video_duration_seconds')) {
-                    $duration = (int) PRESS_LMS_Vimeo::get_video_duration_seconds($vimeo_id);
-                }
-                if (method_exists('PRESS_LMS_Vimeo', 'get_video_modified_time')) {
-                    $remote_modified = (string) PRESS_LMS_Vimeo::get_video_modified_time($vimeo_id);
-                }
-
-                update_post_meta($post_id, '_press_lesson_duration', max(0, $duration));
-                update_post_meta($post_id, '_press_lesson_vimeo_id_cached', $vimeo_id);
-                update_post_meta($post_id, '_press_lesson_vimeo_modified_cached', $remote_modified);
-            } else {
-                // Without a token, keep the local duration and only recalculate totals.
-            }
-
-            // Always refresh the total course duration after lesson updates.
-            if ($course_id > 0 && class_exists('PRESSLMS_Duration')) {
-                PRESSLMS_Duration::recalc_course_total_duration($course_id);
-            }
-        }, 20, 3);
+        PRESSLMS_Duration::init();
     }
     public static function ajax_track_progress()
     {
@@ -135,7 +49,9 @@ class PRESS_LMS_Actions
         if (
             !$lesson instanceof WP_Post ||
             $lesson->post_type !== 'press_lesson' ||
-            $lesson_course_id !== $course_id
+            $lesson_course_id !== $course_id ||
+            !PRESS_LMS_Helpers::is_viewable_post($lesson, 'press_lesson') ||
+            !PRESS_LMS_Helpers::is_viewable_post(get_post($course_id), 'press_course')
         ) {
             wp_send_json_error(['message' => 'A aula informada não pertence ao curso.'], 400);
         }
@@ -144,23 +60,47 @@ class PRESS_LMS_Actions
             wp_send_json_error(['message' => 'Sem acesso ao curso.'], 403);
         }
 
-        if (class_exists('PRESS_LMS_Progress')) {
-            PRESS_LMS_Progress::upsert_progress(
+        if (isset($_POST['played_ranges'])) {
+            $raw_ranges = wp_unslash($_POST['played_ranges']);
+            if (!is_string($raw_ranges) || strlen($raw_ranges) > 100000) {
+                wp_send_json_error(['message' => 'Trechos assistidos invalidos.'], 400);
+            }
+            $ranges = json_decode($raw_ranges, true);
+            $video_id = PRESS_LMS_Vimeo::parse_video_id((string) get_post_meta($lesson_id, '_press_lesson_video_url', true));
+            if (!is_array($ranges) || count($ranges) > 1000 || !$video_id || $video_id !== (int) ($_POST['video_id'] ?? 0)) {
+                wp_send_json_error(['message' => 'Video alterado ou dados invalidos. Recarregue a aula.'], 400);
+            }
+            if ((int) get_post_meta($lesson_id, '_press_lesson_duration', true) <= 0) {
+                PRESSLMS_Duration::sync_lesson_duration($lesson_id);
+            }
+            $saved = PRESS_LMS_Progress::record_video_progress($user_id, $course_id, $lesson_id, $ranges, max(0, (float) ($_POST['position'] ?? 0)));
+            if (is_wp_error($saved)) {
+                wp_send_json_error(['message' => $saved->get_error_message()], 503);
+            }
+        } elseif (class_exists('PRESS_LMS_Progress')) {
+            $saved = PRESS_LMS_Progress::upsert_progress(
                 $user_id,
                 $course_id,
                 $lesson_id,
                 $watched_seconds,
                 $completed
             );
+            if (!$saved) {
+                wp_send_json_error(['message' => 'Não foi possível salvar o progresso. Tente novamente.'], 500);
+            }
         }
 
-        $percent = class_exists('PRESS_LMS_Progress')
-            ? PRESS_LMS_Progress::get_course_progress_percent($user_id, $course_id)
-            : 0;
+        $summary = PRESS_LMS_Progress::get_course_progress_summary($user_id, $course_id);
+        $lesson_progress = PRESS_LMS_Progress::get_lesson_progress($user_id, $lesson_id);
 
         wp_send_json_success([
             'message' => 'Progresso salvo.',
-            'course_progress_percent' => $percent,
+            'course_progress_percent' => $summary['percent'],
+            'course_duration' => $summary['duration_seconds'],
+            'course_watched_seconds' => $summary['watched_seconds'],
+            'duration_complete' => $summary['duration_complete'],
+            'lesson_duration' => (int) get_post_meta($lesson_id, '_press_lesson_duration', true),
+            'lesson_completed' => !empty($lesson_progress->completed),
         ]);
     }
     public static function ajax_change_student_password()
@@ -426,7 +366,7 @@ class PRESS_LMS_Actions
         $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
         $fallback_url = wp_get_referer() ?: '';
 
-        if (!$course_id || get_post_type($course_id) !== 'press_course') {
+        if (!$course_id || !PRESS_LMS_Helpers::is_viewable_post(get_post($course_id), 'press_course')) {
             self::redirect_to_enrollment_notice('enroll_invalid_request', 0, $fallback_url);
         }
 
@@ -442,26 +382,7 @@ class PRESS_LMS_Actions
             self::redirect_to_enrollment_notice('enroll_woo_required', $course_id, $fallback_url);
         }
 
-        // Unauthenticated users must go through account login or registration first.
-        if (!is_user_logged_in()) {
-            $myaccount = wc_get_page_permalink('myaccount');
-
-            $continue_url = add_query_arg([
-                'action'    => 'press_lms_enroll_continue',
-                'course_id' => $course_id,
-                '_wpnonce'  => wp_create_nonce('press_lms_enroll_continue_' . $course_id),
-            ], admin_url('admin-post.php'));
-
-            // Keep the redirect URL raw so WooCommerce can preserve it correctly.
-            $target = add_query_arg([
-                'redirect_to' => $continue_url,
-            ], $myaccount);
-
-            wp_safe_redirect($target);
-            exit;
-        }
-
-        // Logged-in users can continue directly to checkout.
+        // WooCommerce preserves the guest cart and handles account creation at checkout.
         self::do_enroll_and_redirect_to_checkout(get_current_user_id(), $course_id);
     }
 
@@ -472,28 +393,13 @@ class PRESS_LMS_Actions
     {
         $course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
 
-        if (!$course_id || get_post_type($course_id) !== 'press_course') {
+        if (!$course_id || !PRESS_LMS_Helpers::is_viewable_post(get_post($course_id), 'press_course')) {
             self::redirect_to_enrollment_notice('enroll_invalid_request');
         }
 
-        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce((string) wp_unslash($_GET['_wpnonce']), 'press_lms_enroll_continue_' . $course_id)) {
-            self::redirect_to_enrollment_notice('enroll_invalid_request', $course_id);
-        }
-
-        if (class_exists('PRESS_LMS_Enrollments') && PRESS_LMS_Enrollments::is_course_paused($course_id)) {
-            self::redirect_to_enrollment_notice('enroll_course_paused', $course_id);
-        }
-
-        if (!is_user_logged_in()) {
-            // If the customer is still unauthenticated, return to My Account.
-            if (class_exists('WooCommerce') && function_exists('wc_get_page_permalink')) {
-                wp_safe_redirect(wc_get_page_permalink('myaccount'));
-                exit;
-            }
-            self::redirect_to_enrollment_notice('enroll_login_required', $course_id);
-        }
-
-        self::do_enroll_and_redirect_to_checkout(get_current_user_id(), $course_id);
+        // Old login links must not mutate a cart with a nonce from another session.
+        wp_safe_redirect(self::get_course_frontend_url($course_id));
+        exit;
     }
 
     /**
@@ -534,9 +440,6 @@ class PRESS_LMS_Actions
             self::redirect_to_enrollment_notice('enroll_course_paused', (int) $course_id);
         }
 
-        // Create the pending enrollment before checkout.
-        PRESS_LMS_Enrollments::get_or_create_pending((int)$user_id, (int)$course_id, 'woocommerce');
-
         $product_id = PRESS_LMS_Enrollments::get_course_product_id((int)$course_id);
         if (!$product_id || !get_post($product_id)) {
             self::redirect_to_enrollment_notice('enroll_product_missing', (int) $course_id);
@@ -548,9 +451,22 @@ class PRESS_LMS_Actions
             self::redirect_to_enrollment_notice('enroll_cart_unavailable', (int) $course_id);
         }
 
-        // Replace cart contents so checkout contains only the selected course.
-        WC()->cart->empty_cart();
-        WC()->cart->add_to_cart((int)$product_id, 1);
+        if ($user_id > 0 && PRESS_LMS_Enrollments::has_active_enrollment((int) $user_id, (int) $course_id)) {
+            wp_safe_redirect(self::get_course_frontend_url((int) $course_id));
+            exit;
+        }
+
+        foreach (WC()->cart->get_cart() as $item) {
+            if ((int) ($item['product_id'] ?? 0) === (int) $product_id) {
+                wp_safe_redirect(wc_get_checkout_url());
+                exit;
+            }
+        }
+
+        if (!WC()->cart->add_to_cart((int) $product_id, 1)) {
+            wp_safe_redirect(wc_get_cart_url());
+            exit;
+        }
 
         wp_safe_redirect(wc_get_checkout_url());
         exit;
@@ -600,7 +516,7 @@ class PRESS_LMS_Actions
             return $fallback;
         }
 
-        if (user_can($user, 'manage_options')) {
+        if (user_can($user, 'manage_options') || user_can($user, 'manage_woocommerce') || user_can($user, 'edit_posts')) {
             return $fallback;
         }
 

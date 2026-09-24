@@ -5,6 +5,55 @@ class PRESS_LMS_Helpers {
     private static $lesson_thumbnail_cache = [];
     private const STUDENT_AVATAR_META_KEY = 'press_lms_avatar_id';
 
+    public static function is_viewable_post($post, string $type): bool
+    {
+        if (!$post instanceof WP_Post || $post->post_type !== $type || in_array($post->post_status, ['trash', 'auto-draft'], true)) {
+            return false;
+        }
+        if ($post->post_status !== 'publish' && !current_user_can('edit_post', $post->ID)) {
+            return false;
+        }
+        return !post_password_required($post) || current_user_can('edit_post', $post->ID);
+    }
+
+    public static function get_visible_course(string $slug)
+    {
+        $course = get_page_by_path($slug, OBJECT, 'press_course');
+        return self::is_viewable_post($course, 'press_course') ? $course : null;
+    }
+
+    public static function is_sample_lesson(int $lesson_id, int $course_id): bool
+    {
+        $lesson = get_post($lesson_id);
+        $course = get_post($course_id);
+        if (!$lesson instanceof WP_Post || !$course instanceof WP_Post
+            || $lesson->post_type !== 'press_lesson' || $course->post_type !== 'press_course'
+            || $lesson->post_status !== 'publish' || $course->post_status !== 'publish'
+            || !empty($lesson->post_password) || !empty($course->post_password)) {
+            return false;
+        }
+        $parent = (int) $lesson->post_parent ?: (int) get_post_meta($lesson_id, '_press_lesson_course_id', true);
+        return $parent === $course_id && get_post_meta($lesson_id, '_press_lesson_free_preview', true) === 'yes';
+    }
+
+    public static function render_post_content(WP_Post $content_post): string
+    {
+        // Elementor and shortcodes resolve their document from the global post.
+        $previous = $GLOBALS['post'] ?? null;
+        try {
+            $GLOBALS['post'] = $content_post;
+            setup_postdata($content_post);
+            return (string) apply_filters('the_content', $content_post->post_content);
+        } finally {
+            $GLOBALS['post'] = $previous;
+            if ($previous instanceof WP_Post) {
+                setup_postdata($previous);
+            } else {
+                wp_reset_postdata();
+            }
+        }
+    }
+
     public static function get_course_lessons($course_id, $post_status = ['publish']) {
         $course_id = (int) $course_id;
         if ($course_id <= 0) return [];
@@ -19,7 +68,8 @@ class PRESS_LMS_Helpers {
             'post_status'    => $statuses,
             'posts_per_page' => -1,
             'post_parent'    => $course_id,
-            'orderby'        => 'menu_order title',
+            'update_post_term_cache' => false,
+            'orderby'        => 'menu_order ID',
             'order'          => 'ASC',
         ]);
 
@@ -29,7 +79,8 @@ class PRESS_LMS_Helpers {
             'posts_per_page' => -1,
             'meta_key'       => '_press_lesson_course_id',
             'meta_value'     => $course_id,
-            'orderby'        => 'menu_order title',
+            'update_post_term_cache' => false,
+            'orderby'        => 'menu_order ID',
             'order'          => 'ASC',
         ]);
 
@@ -39,6 +90,7 @@ class PRESS_LMS_Helpers {
             if (!$lesson instanceof WP_Post) {
                 continue;
             }
+            if ((int) $lesson->post_parent > 0 && (int) $lesson->post_parent !== $course_id) continue;
 
             $indexed[$lesson->ID] = $lesson;
         }
@@ -46,12 +98,14 @@ class PRESS_LMS_Helpers {
         $lessons = array_values($indexed);
 
         usort($lessons, function ($a, $b) {
-            $order_compare = (int) $a->menu_order <=> (int) $b->menu_order;
+            // Explicit positions come first; zero means registration order (stable ID).
+            $order_compare = ((int) $a->menu_order > 0 ? (int) $a->menu_order : PHP_INT_MAX)
+                <=> ((int) $b->menu_order > 0 ? (int) $b->menu_order : PHP_INT_MAX);
             if ($order_compare !== 0) {
                 return $order_compare;
             }
 
-            return strcasecmp($a->post_title, $b->post_title);
+            return (int) $a->ID <=> (int) $b->ID;
         });
 
         return $lessons;

@@ -3,7 +3,7 @@
 /**
  * Plugin Name:       Pressplay LMS
  * Description:       Sell online courses with WooCommerce-powered enrollments, protected lessons, student dashboards, progress tracking, and certificates.
- * Version:           1.0.1
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Requires Plugins:  woocommerce
@@ -28,7 +28,7 @@ add_action('before_woocommerce_init', static function () {
 });
 
 // Define plugin-wide constants used across bootstrap, assets, and templates.
-define('PRESS_LMS_VERSION', '1.0.1');
+define('PRESS_LMS_VERSION', '1.1.0');
 define('PRESS_LMS_FILE', __FILE__);
 define('PRESS_LMS_PATH', plugin_dir_path(__FILE__));
 define('PRESS_LMS_URL', plugin_dir_url(__FILE__));
@@ -52,8 +52,10 @@ require_once PRESS_LMS_PATH . 'includes/CPT_Teacher.php';
 require_once PRESS_LMS_PATH . 'includes/Metabox_Course.php';
 require_once PRESS_LMS_PATH . 'includes/Metabox_Lesson.php';
 require_once PRESS_LMS_PATH . 'includes/Woo.php';
+require_once PRESS_LMS_PATH . 'includes/Terms.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Templates.php';
 require_once PRESS_LMS_PATH . 'includes/Enrollments.php';
+require_once PRESS_LMS_PATH . 'includes/Manual_Enrollments.php';
 require_once PRESS_LMS_PATH . 'includes/Actions.php';
 require_once PRESS_LMS_PATH . 'includes/Vimeo.php';
 require_once PRESS_LMS_PATH . 'includes/Core/Assets.php';

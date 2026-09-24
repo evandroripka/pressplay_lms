@@ -151,6 +151,9 @@ class PRESS_LMS_Lesson_Meta
         }
         echo '</select></p>';
 
+        echo '<p><label><input type="checkbox" name="press_lesson_free_preview" value="yes" ' . checked(get_post_meta($post->ID, '_press_lesson_free_preview', true), 'yes', false) . '> <strong>Aula gratuita de amostra</strong></label></p>';
+        echo '<p class="description">Libera o video e o texto desta aula publicada sem login ou matricula. Materiais e progresso continuam exclusivos dos alunos com acesso. As demais aulas permanecem protegidas.</p>';
+
         echo '<p><label><strong>Vídeo (Vimeo/YouTube URL)</strong></label><br>';
         echo '<input type="url" name="press_lesson_video_url" value="' . esc_attr($video_url) . '" class="widefat" placeholder="https://vimeo.com/... ou https://youtu.be/..."></p>';
 
@@ -162,7 +165,7 @@ class PRESS_LMS_Lesson_Meta
             echo '<p style="margin:6px 0;color:#0a7b34;"><strong>OK:</strong> Vimeo ID #' . esc_html($vimeo_id) . ' — ' . esc_html($vimeo_title ?: 'Vídeo validado') . '</p>';
             echo '<div style="max-width:860px;margin-top:10px;">';
             if (class_exists('PRESS_LMS_Vimeo')) {
-                echo PRESS_LMS_Vimeo::get_embed_html($vimeo_id);
+                echo PRESS_LMS_Vimeo::get_embed_html($vimeo_id, 960, (string) $video_url);
             } else {
                 echo '<p style="color:#666">Classe Vimeo não carregada.</p>';
             }
@@ -188,7 +191,12 @@ class PRESS_LMS_Lesson_Meta
         echo '</select>';
         echo '</div>';
 
-        // Lesson materials editor.
+        self::render_materials_editor($materials);
+    }
+
+    /** Shared editor; a course and a lesson each have their own admin screen. */
+    public static function render_materials_editor(array $materials): void
+    {
         echo '<hr>';
         echo '<div style="margin-top:10px;">';
         echo '<p style="margin:0 0 6px 0;"><strong>Materiais</strong></p>';
@@ -545,9 +553,14 @@ class PRESS_LMS_Lesson_Meta
         }
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
+        if (wp_is_post_revision($post_id)) return;
+
+        update_post_meta($post_id, '_press_lesson_free_preview', ($_POST['press_lesson_free_preview'] ?? '') === 'yes' ? 'yes' : 'no');
 
         $course_id = intval(wp_unslash($_POST['press_lesson_course_id'] ?? 0));
         $video_url = esc_url_raw((string) wp_unslash($_POST['press_lesson_video_url'] ?? ''));
+        $previous_course_id = (int) $post->post_parent ?: (int) get_post_meta($post_id, self::META_COURSE_ID, true);
+        $previous_url = (string) get_post_meta($post_id, self::META_VIDEO_URL, true);
 
         update_post_meta($post_id, self::META_COURSE_ID, $course_id);
         global $wpdb;
@@ -560,7 +573,23 @@ class PRESS_LMS_Lesson_Meta
 
         clean_post_cache($post_id);
         update_post_meta($post_id, self::META_VIDEO_URL, $video_url);
+        if ($previous_course_id > 0 && $previous_course_id !== $course_id) {
+            PRESSLMS_Duration::recalc_course_total_duration($previous_course_id);
+        }
+        if ($previous_url !== $video_url) {
+            update_post_meta($post_id, '_press_lesson_duration', 0);
+        }
 
+        self::save_submitted_materials($post_id, self::META_MATERIALS);
+        if (isset($_POST['press_lesson_teacher'])) {
+            update_post_meta($post_id, '_press_lesson_teacher', (int) wp_unslash($_POST['press_lesson_teacher']));
+        }
+        self::sync_vimeo($post_id, $video_url);
+    }
+
+    /** Call only after the enclosing editor's nonce and edit capability checks. */
+    public static function save_submitted_materials(int $post_id, string $meta_key): void
+    {
         // Rebuild the structured v2 materials array from the submitted fields.
         $items = [];
 
@@ -576,18 +605,18 @@ class PRESS_LMS_Lesson_Meta
                 $type = is_string($t) ? sanitize_key($t) : 'link';
                 $type = in_array($type, ['file', 'link'], true) ? $type : 'link';
 
-                $id = isset($ids[$k]) ? sanitize_text_field((string)$ids[$k]) : '';
+                $id = isset($ids[$k]) && is_scalar($ids[$k]) ? sanitize_text_field((string)$ids[$k]) : '';
                 if ($id === '') $id = self::generate_item_id();
 
-                $name = isset($names[$k]) ? sanitize_text_field((string)$names[$k]) : '';
+                $name = isset($names[$k]) && is_scalar($names[$k]) ? sanitize_text_field((string)$names[$k]) : '';
 
                 $att_id = isset($atts[$k]) ? intval($atts[$k]) : 0;
 
                 // Read the URL from the field set that matches the current type.
                 if ($type === 'file') {
-                    $url = isset($urls_file[$k]) ? (string)$urls_file[$k] : '';
+                    $url = isset($urls_file[$k]) && is_string($urls_file[$k]) ? $urls_file[$k] : '';
                 } else {
-                    $url = isset($urls_link[$k]) ? (string)$urls_link[$k] : '';
+                    $url = isset($urls_link[$k]) && is_string($urls_link[$k]) ? $urls_link[$k] : '';
                 }
 
                 $url = trim((string) $url);
@@ -643,11 +672,11 @@ class PRESS_LMS_Lesson_Meta
             $items = PRESS_LMS_Materials::normalize_items($items);
             if (is_array($items)) $items = array_values($items);
         }
-        if (isset($_POST['press_lesson_teacher'])) {
-            update_post_meta($post_id, '_press_lesson_teacher', (int) wp_unslash($_POST['press_lesson_teacher']));
-        }
-        update_post_meta($post_id, self::META_MATERIALS, $items);
+        update_post_meta($post_id, $meta_key, wp_slash($items));
+    }
 
+    private static function sync_vimeo(int $post_id, string $video_url): void
+    {
         // Validate Vimeo metadata and cache the current video payload.
         if ($video_url === '' || stripos($video_url, 'vimeo.com') === false) {
             delete_post_meta($post_id, '_press_lesson_vimeo_id');
@@ -671,23 +700,13 @@ class PRESS_LMS_Lesson_Meta
             return;
         }
 
-        if (!PRESS_LMS_Vimeo::has_token()) {
-            update_post_meta($post_id, '_press_lesson_vimeo_id', (int)$video_id);
-            update_post_meta($post_id, '_press_lesson_vimeo_title', '');
-            update_post_meta($post_id, '_press_lesson_vimeo_link', $video_url);
-            update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id));
-            update_post_meta($post_id, '_press_lesson_vimeo_error', 'Token Vimeo não configurado. Configure em Pressplay LMS → Configurações.');
-            delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
-            return;
-        }
-
-        $data = PRESS_LMS_Vimeo::get_video_data($video_id);
+        $data = PRESS_LMS_Vimeo::get_video_metadata($video_url);
 
         if (is_wp_error($data)) {
             update_post_meta($post_id, '_press_lesson_vimeo_id', (int)$video_id);
             update_post_meta($post_id, '_press_lesson_vimeo_title', '');
             update_post_meta($post_id, '_press_lesson_vimeo_link', $video_url);
-            update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id));
+            update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id, 960, $video_url));
             update_post_meta($post_id, '_press_lesson_vimeo_error', $data->get_error_message());
             delete_post_meta($post_id, self::META_VIMEO_THUMBNAIL);
             return;
@@ -703,7 +722,7 @@ class PRESS_LMS_Lesson_Meta
         update_post_meta($post_id, '_press_lesson_vimeo_id', (int)$video_id);
         update_post_meta($post_id, '_press_lesson_vimeo_title', $title);
         update_post_meta($post_id, '_press_lesson_vimeo_link', $video_url);
-        update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id));
+        update_post_meta($post_id, '_press_lesson_vimeo_embed_html', PRESS_LMS_Vimeo::get_embed_html($video_id, 960, $video_url));
         if ($thumbnail_url !== '') {
             update_post_meta($post_id, self::META_VIMEO_THUMBNAIL, esc_url_raw($thumbnail_url));
         } else {
